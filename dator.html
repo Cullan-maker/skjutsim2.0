@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <title>Måltavla (Dator)</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        body { margin: 0; background: #111; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
+        #topBar { position: absolute; top: 0; left: 0; width: 100%; background: #222; padding: 15px; text-align: center; font-size: 24px; border-bottom: 2px solid #444; }
+        #roomCode { color: #00FF00; font-weight: bold; font-size: 32px; letter-spacing: 2px;}
+        canvas { background: #1a1a1a; box-shadow: 0 0 20px rgba(0,0,0,0.8); border-radius: 10px; margin-top: 50px; }
+        #feedback { font-size: 20px; color: #FFD700; margin-top: 15px; height: 30px;}
+    </style>
+</head>
+<body>
+    <div id="topBar">
+        STATUS: <span id="statusText">Skapar rum...</span> | KOD FÖR TELEFONEN: <span id="roomCode">...</span>
+    </div>
+    
+    <canvas id="targetCanvas" width="700" height="700"></canvas>
+    <div id="feedback">Väntar på skytt...</div>
+
+    <script>
+        const canvas = document.getElementById('targetCanvas');
+        const ctx = canvas.getContext('2d');
+        let crossX = 350, crossY = 350;
+        let holes = [];
+
+        // Generera en slumpmässig 4-siffrig kod
+        const myCode = Math.floor(1000 + Math.random() * 9000).toString();
+        document.getElementById('roomCode').innerText = myCode;
+
+        // Starta Nätverket
+        const peer = new Peer('banan-' + myCode);
+        
+        peer.on('open', (id) => {
+            document.getElementById('statusText').innerText = "Redo!";
+        });
+
+        peer.on('connection', (conn) => {
+            document.getElementById('statusText').innerText = "TELEFON ANSLUTEN!";
+            document.getElementById('statusText').style.color = "#00FF00";
+            
+            conn.on('data', (data) => {
+                if(data.type === 'aim') {
+                    // Skalar upp telefonens 600x600 yta till datorns 700x700
+                    crossX = data.x * (700/600);
+                    crossY = data.y * (700/600);
+                }
+                if(data.type === 'fire') {
+                    const hitX = crossX;
+                    const hitY = crossY;
+                    holes.push({x: hitX, y: hitY});
+                    playHitSound();
+                    
+                    const dist = Math.sqrt(Math.pow(hitX-350,2) + Math.pow(hitY-350,2));
+                    const score = Math.max(0, 100 - (dist/3.5)).toFixed(1);
+                    document.getElementById('feedback').innerText = `TRÄFF! Poäng: ${score}`;
+                }
+            });
+        });
+
+        function playHitSound() {
+            const actx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = actx.createOscillator(), gain = actx.createGain();
+            osc.type = 'square'; osc.frequency.setValueAtTime(100, actx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(10, actx.currentTime + 0.3);
+            gain.gain.setValueAtTime(1, actx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, actx.currentTime + 0.3);
+            osc.connect(gain); gain.connect(actx.destination);
+            osc.start(); osc.stop(actx.currentTime + 0.3);
+        }
+
+        function drawLoop() {
+            ctx.clearRect(0,0,700,700);
+            // Rita tavla
+            for(let i=5; i>0; i--) {
+                ctx.beginPath(); ctx.arc(350,350, i*60, 0, 7);
+                ctx.fillStyle = i%2===0 ? '#111' : '#b71c1c'; ctx.fill();
+                ctx.strokeStyle = '#222'; ctx.stroke();
+            }
+            // Rita skotthål
+            holes.forEach(h => {
+                ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(h.x,h.y,6,0,7); ctx.fill();
+                ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.stroke();
+            });
+            // Rita Siktet från telefonen
+            ctx.strokeStyle = '#00FFFF'; ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(crossX-15, crossY); ctx.lineTo(crossX+15, crossY);
+            ctx.moveTo(crossX, crossY-15); ctx.lineTo(crossX, crossY+15);
+            ctx.stroke();
+            ctx.beginPath(); ctx.arc(crossX, crossY, 8, 0, 7); ctx.stroke();
+
+            requestAnimationFrame(drawLoop);
+        }
+        drawLoop();
+    </script>
+</body>
+</html>
