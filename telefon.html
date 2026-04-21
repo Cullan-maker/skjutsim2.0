@@ -3,185 +3,219 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Vapen-Sensor (Smart)</title>
+    <title>AR Glock-Sikte</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <style>
-        body { 
-            background: #1e1e1e; color: white; font-family: sans-serif; 
-            text-align: center; padding: 20px; margin: 0;
-        }
-        h2 { margin-bottom: 5px; }
-        .warning { color: #ff9800; font-size: 14px; margin-bottom: 20px; }
+        body { margin: 0; background: #000; color: white; font-family: sans-serif; overflow: hidden; text-align: center; }
         
-        button { 
-            background: #4CAF50; color: white; border: none; 
-            padding: 20px; font-size: 20px; font-weight: bold;
-            border-radius: 10px; width: 100%; margin-bottom: 15px; 
-            cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-        }
-        button:active { background: #45a049; transform: translateY(2px); }
+        /* Bakgrundskamera */
+        #camera-stream { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; object-fit: cover; z-index: 1; }
         
-        #testBtn { background: #2196F3; display: none; }
-        #testBtn:active { background: #1976D2; }
-        
-        #status-box {
-            background: #333; padding: 15px; border-radius: 8px; 
-            margin-bottom: 20px; font-size: 16px; min-height: 40px;
-        }
+        /* Canvas för Spår (Trace) */
+        #traceCanvas { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2; pointer-events: none; }
 
-        #mic-container { background: #222; padding: 15px; border-radius: 8px; }
-        #mic-indicator { 
-            width: 100%; height: 30px; background: #444; 
-            margin: 10px 0; border-radius: 5px; overflow: hidden; 
-            position: relative;
-        }
-        #mic-level { height: 100%; width: 0%; background: #00FF00; transition: width 0.05s; }
-        #threshold-line {
-            position: absolute; top: 0; bottom: 0; width: 2px; 
-            background: red; z-index: 10;
-        }
+        /* UI och Knappar överst */
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 10; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; }
         
-        input[type=range] { width: 100%; margin-top: 10px; }
+        .panel { background: rgba(0,0,0,0.7); padding: 10px; pointer-events: auto; }
+        
+        button { background: #4CAF50; color: white; border: none; padding: 15px; font-size: 18px; border-radius: 8px; width: 90%; margin: 5px; font-weight: bold; cursor: pointer; }
+        #calBtn { background: #2196F3; display: none; }
+        
+        /* --- GLOCK SIKTET (Virtuellt) --- */
+        #sight-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5; pointer-events: none; width: 150px; height: 100px; }
+        /* Bakre siktet (U-skåran med vit linje) */
+        .rear-sight { position: absolute; bottom: 0; left: 0; width: 150px; height: 40px; background: #222; border-top: 3px solid white; clip-path: polygon(0 0, 40px 0, 40px 100%, 110px 100%, 110px 0, 150px 0, 150px 100%, 0 100%); }
+        /* Främre siktet (Korn med vit prick) */
+        .front-sight { position: absolute; bottom: 20px; left: 65px; width: 20px; height: 50px; background: #111; }
+        .front-dot { position: absolute; top: 5px; left: 5px; width: 10px; height: 10px; background: white; border-radius: 50%; box-shadow: 0 0 5px rgba(255,255,255,0.8); }
+
+        #mic-indicator { width: 90%; height: 20px; background: #444; margin: 10px auto; border-radius: 5px; position: relative; }
+        #mic-level { height: 100%; width: 0%; background: #00FF00; transition: width 0.05s; }
+        #threshold-line { position: absolute; top: 0; bottom: 0; width: 2px; background: red; z-index: 10; left: 60%; }
+        input[type=range] { width: 90%; }
     </style>
 </head>
 <body>
 
-    <h2>Vapen-Sensor</h2>
-    <div class="warning">OBS: Fungerar endast via en https-länk (t.ex. GitHub Pages)</div>
+    <video id="camera-stream" autoplay playsinline muted></video>
+    
+    <canvas id="traceCanvas"></canvas>
 
-    <button id="startBtn">1. Aktivera Systemet</button>
-    <button id="testBtn">Skjut Manuellt (Test)</button>
+    <div id="sight-container" style="display: none;">
+        <div class="front-sight"><div class="front-dot"></div></div>
+        <div class="rear-sight"></div>
+    </div>
 
-    <div id="status-box">Status: Ej startad. Klicka på knappen ovan.</div>
-
-    <div id="mic-container">
-        <p style="margin:0 0 10px 0;"><strong>Mikrofonnivå</strong></p>
-        <div id="mic-indicator">
-            <div id="mic-level"></div>
-            <div id="threshold-line" style="left: 60%;"></div>
+    <div id="ui-layer">
+        <div class="panel">
+            <h3 style="margin:0 0 5px 0;">AR Vapen-Sensor</h3>
+            <div id="status">Klicka Start för kamera & mikrofon</div>
+            <button id="startBtn">STARTA AR-LÄGE</button>
+            <button id="calBtn">KALIBRERA (Sikta på mitten av skärmen)</button>
         </div>
-        <p style="font-size: 14px; color: #aaa;">Känslighet (Röd linje): <span id="thresh-val">150</span></p>
-        <input type="range" id="threshold" min="0" max="255" value="150">
+
+        <div class="panel" id="mic-panel" style="display: none;">
+            <div id="mic-indicator"><div id="mic-level"></div><div id="threshold-line"></div></div>
+            <input type="range" id="threshold" min="0" max="255" value="150">
+        </div>
     </div>
 
     <script>
-        // --- VIKTIGT: ÄNDRA TILL SAMMA ID SOM PÅ DATORN ---
         const MY_ID = "min_unika_simulator_123"; 
-        // --------------------------------------------------
 
         let client, audioContext, analyser, dataArray;
-        let isReadyToShoot = true; // Förhindrar maskingevärs-effekt
+        let isReadyToShoot = true;
+        
+        // Gyrovariabler
+        let startAlpha = null, startBeta = null, startGamma = null;
+        let currentX = 0, currentY = 0;
+        let trace = [];
 
         const startBtn = document.getElementById('startBtn');
-        const testBtn = document.getElementById('testBtn');
-        const statusBox = document.getElementById('status-box');
-        const micLevel = document.getElementById('mic-level');
-        const thresholdInput = document.getElementById('threshold');
-        const thresholdLine = document.getElementById('threshold-line');
-        const threshVal = document.getElementById('thresh-val');
+        const calBtn = document.getElementById('calBtn');
+        const statusEl = document.getElementById('status');
+        const video = document.getElementById('camera-stream');
+        const canvas = document.getElementById('traceCanvas');
+        const ctx = canvas.getContext('2d');
 
-        // Uppdatera den röda linjen när man drar i reglaget
-        thresholdInput.addEventListener('input', (e) => {
-            const val = e.target.value;
-            threshVal.innerText = val;
-            thresholdLine.style.left = (val / 2.55) + "%";
+        // Hantera fönsterstorlek för canvas
+        function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        document.getElementById('threshold').addEventListener('input', (e) => {
+            document.getElementById('threshold-line').style.left = (e.target.value / 2.55) + "%";
         });
 
         async function initSystem() {
             try {
-                startBtn.innerText = "Laddar...";
-                statusBox.innerHTML = "Frågar om mikrofon-behörighet...<br><em>(Klicka 'Tillåt' om du får en fråga)</em>";
-
-                // 1. Starta Mikrofonen
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                startBtn.innerText = "Laddar kamera och mic...";
                 
-                const AudioContext = window.AudioContext || window.webkitAudioContext;
-                audioContext = new AudioContext();
+                // 1. Begär både Kamera och Mikrofon (Kamera vänd bort från användaren)
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: true, 
+                    video: { facingMode: "environment" } 
+                });
+                video.srcObject = stream;
+
+                // 2. Starta Ljudanalys
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                audioContext = new AudioCtx();
+                if(audioContext.state === 'suspended') audioContext.resume();
+                
                 const source = audioContext.createMediaStreamSource(stream);
                 analyser = audioContext.createAnalyser();
                 source.connect(analyser);
                 dataArray = new Uint8Array(analyser.frequencyBinCount);
 
-                statusBox.innerHTML = "Mikrofon OK. Ansluter till nätverket...";
+                // 3. Begär Gyroskop (iOS krav)
+                if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    const perm = await DeviceOrientationEvent.requestPermission();
+                    if (perm !== 'granted') throw new Error("Gyroskop nekat.");
+                }
 
-               // 2. Koppla upp mot molnet (MQTT)
-                const randomClientId = "phone_" + Math.random().toString(16).substring(2, 10);
-                
-                // ÄNDRAD TILL PORT 8884
-                client = new Paho.MQTT.Client("broker.hivemq.com", Number(8884), randomClientId);
-                
+                // 4. MQTT Koppling
+                client = new Paho.MQTT.Client("broker.hivemq.com", Number(8884), "phone_" + Math.random().toString(16).substr(2, 8));
                 client.connect({ 
-                    useSSL: true, // LÄGG TILL DENNA RAD FÖR SÄKERHET!
+                    useSSL: true,
                     onSuccess: () => { 
-                        statusBox.innerHTML = "<span style='color: #4CAF50; font-weight: bold;'>Kopplad och Klar!</span><br>Rikta mot skärmen och tryck av.";
+                        statusEl.innerHTML = "<span style='color:lime'>Ansluten! Kalibrera vapnet mot skärmen.</span>";
                         startBtn.style.display = "none";
-                        testBtn.style.display = "block";
-                        detectSound();
-                    },
-                    onFailure: (err) => {
-                        statusBox.innerHTML = "<span style='color: red;'>Nätverksfel: Kunde inte ansluta till servern.</span>";
-                        console.error(err);
-                        startBtn.innerText = "Försök Igen";
+                        calBtn.style.display = "block";
+                        document.getElementById('mic-panel').style.display = "block";
+                        document.getElementById('sight-container').style.display = "block";
+                        
+                        window.addEventListener('deviceorientation', handleOrientation);
+                        detectSound(); 
+                        drawLoop();
                     }
                 });
 
-          } catch (error) {
-                console.error(error);
-                
-                // SKRIV UT DET EXAKTA TEKNISKA FELET PÅ SKÄRMEN
-                statusBox.innerHTML = `
-                    <span style='color: #f44336;'>
-                        <b>Tekniskt Fel!</b><br>
-                        Namn: ${error.name}<br>
-                        Meddelande: ${error.message}
-                    </span>
-                `;
-                
-                startBtn.innerText = "Försök Igen";
-                startBtn.style.display = "block";
+            } catch (error) {
+                alert("Fel: " + error.message + "\nSe till att länken är HTTPS.");
             }
         }
 
-        // Lyssnar-loopen (Körs 60 gånger i sekunden)
+        // --- KALIBRERING ---
+        // Sätter nollpunkten dit du pekar just nu
+        calBtn.addEventListener('click', () => {
+            startAlpha = null; // Tvingar nästa gyro-uppdatering att bli den nya nollpunkten
+            trace = [];
+            statusEl.innerHTML = "<span style='color:lime'>Kalibrerad! Redo att skjuta.</span>";
+        });
+
+        function handleOrientation(event) {
+            if (startAlpha === null) { 
+                startAlpha = event.alpha; startBeta = event.beta; startGamma = event.gamma; 
+            }
+            // Räkna ut skillnaden från när vi kalibrerade
+            let deltaAlpha = event.alpha - startAlpha;
+            let deltaBeta = event.beta - startBeta;
+            
+            // Hantera kompass-hopp
+            if (deltaAlpha > 180) deltaAlpha -= 360; 
+            if (deltaAlpha < -180) deltaAlpha += 360;
+
+            // Beroende på om telefonen står upp eller ligger ner kan dessa behöva kastas om, 
+            // men detta är standard för stående "Portrait"-läge:
+            currentX = deltaAlpha; 
+            currentY = deltaBeta;
+        }
+
+        // --- RITA GYRO-SPÅRET PÅ SKÄRMEN ---
+        function drawLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Lägg till i spåret (behåll max 30 punkter för en "svans")
+            trace.push({ x: currentX, y: currentY });
+            if (trace.length > 30) trace.shift();
+
+            // Rita spåret (vi ritar det från mitten av skärmen)
+            ctx.beginPath();
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = "rgba(0, 255, 0, 0.8)"; // Grön laserlinje
+            
+            for (let i = 0; i < trace.length; i++) {
+                // Konvertera vinkel till pixlar för skärmvisning (multiplicera med känslighet)
+                let px = (canvas.width / 2) + (trace[i].x * 15);
+                let py = (canvas.height / 2) + (trace[i].y * 15);
+                
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.stroke();
+
+            requestAnimationFrame(drawLoop);
+        }
+
+        // --- LJUDSENSOR & SKJUT ---
         function detectSound() {
             analyser.getByteFrequencyData(dataArray);
-            let maxVol = Math.max(...dataArray); // Hittar den högsta volymen just nu
-            
-            // Animera den gröna mätaren
-            micLevel.style.width = (maxVol / 2.55) + "%";
+            let maxVol = Math.max(...dataArray);
+            document.getElementById('mic-level').style.width = (maxVol / 2.55) + "%";
 
-            // Om ljudet går över gränsen OCH vi är redo att skjuta
-            if (maxVol > thresholdInput.value && isReadyToShoot) {
+            if (maxVol > document.getElementById('threshold').value && isReadyToShoot) {
                 fireShot();
             }
-            
             requestAnimationFrame(detectSound);
         }
 
-        // Skicka signalen till datorn
         function fireShot() {
-            isReadyToShoot = false; // Lås avtryckaren tillfälligt
+            isReadyToShoot = false;
             
-            // Skapa meddelandet "BANG" och skicka till rätt ID
-            const message = new Paho.MQTT.Message("BANG");
+            // Skicka datan till datorskärmen! Inkludera våra gyro-koordinater.
+            const payload = JSON.stringify({ action: "BANG", x: currentX, y: currentY });
+            const message = new Paho.MQTT.Message(payload);
             message.destinationName = MY_ID;
             client.send(message);
             
-            // Visuell blixt på telefonen
-            document.body.style.background = "#f44336"; // Röd
-            statusBox.innerHTML = "<b>PANG!</b> Skott skickat.";
-            
-            // Återställ skärmen och avtryckaren efter en halv sekund
-            setTimeout(() => { 
-                document.body.style.background = "#1e1e1e"; 
-                statusBox.innerHTML = "<span style='color: #4CAF50;'>Redo för nästa skott.</span>";
-                isReadyToShoot = true; 
-            }, 500);
+            // Blixtra till skärmen som rekyl
+            document.getElementById('ui-layer').style.background = "rgba(255,0,0,0.5)";
+            setTimeout(() => { document.getElementById('ui-layer').style.background = "transparent"; isReadyToShoot = true; }, 400);
         }
 
-        // Koppla knapparna
         startBtn.addEventListener('click', initSystem);
-        testBtn.addEventListener('click', fireShot);
     </script>
 </body>
 </html>
