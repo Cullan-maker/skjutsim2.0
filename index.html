@@ -25,8 +25,9 @@
         
         // UNIKT ID - Ändra detta till något helt eget (t.ex. ditt namn + siffror)
         const MY_ID = "min_unika_simulator_123"; 
-
-        const client = new Paho.MQTT.Client("broker.hivemq.com", Number(8000), "screen_" + Math.random());
+     
+// ÄNDRAD TILL PORT 8884
+        const client = new Paho.MQTT.Client("broker.hivemq.com", Number(8884), "screen_" + Math.random());
         
         client.onConnectionLost = (obj) => { info.innerText = "Anslutning bruten!"; };
         client.onMessageArrived = (msg) => {
@@ -35,11 +36,14 @@
             }
         };
 
-        client.connect({ onSuccess: () => {
-            client.subscribe(MY_ID);
-            info.innerText = "Kopplad! Starta serien från telefonen.";
-            startTargetCycle();
-        }});
+        client.connect({ 
+            useSSL: true, // LÄGG TILL DENNA RAD HÄR OCKSÅ
+            onSuccess: () => {
+                client.subscribe(MY_ID);
+                info.innerText = "Kopplad! Starta serien från telefonen.";
+                startTargetCycle();
+            }
+        });
 
         function startTargetCycle() {
             // Tavlan vänder sig var 7:e sekund, är framme i 3 sek
