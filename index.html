@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <title>Skjutbiograf - Skärm</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+    <style>
+        body { margin: 0; background: #111; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; color: white; font-family: sans-serif; }
+        #target-container { perspective: 1000px; }
+        #target {
+            width: 200px; height: 200px; background: url('https://upload.wikimedia.org/wikipedia/commons/1/13/Target_sport_shooting.svg') no-repeat center;
+            background-size: contain; transition: transform 0.4s ease-in-out; transform: rotateY(90deg); /* Startar vänd bort */
+        }
+        .visible { transform: rotateY(0deg) !important; }
+        #info { position: absolute; top: 20px; font-size: 24px; }
+    </style>
+</head>
+<body>
+    <div id="info">Väntar på koppling...</div>
+    <div id="target-container"><div id="target"></div></div>
+
+    <script>
+        const target = document.getElementById('target');
+        const info = document.getElementById('info');
+        
+        // UNIKT ID - Ändra detta till något helt eget (t.ex. ditt namn + siffror)
+        const MY_ID = "min_unika_simulator_123"; 
+
+        const client = new Paho.MQTT.Client("broker.hivemq.com", Number(8000), "screen_" + Math.random());
+        
+        client.onConnectionLost = (obj) => { info.innerText = "Anslutning bruten!"; };
+        client.onMessageArrived = (msg) => {
+            if (msg.payloadString === "BANG") {
+                checkHit();
+            }
+        };
+
+        client.connect({ onSuccess: () => {
+            client.subscribe(MY_ID);
+            info.innerText = "Kopplad! Starta serien från telefonen.";
+            startTargetCycle();
+        }});
+
+        function startTargetCycle() {
+            // Tavlan vänder sig var 7:e sekund, är framme i 3 sek
+            setInterval(() => {
+                target.classList.add('visible');
+                info.innerText = "ELD!";
+                setTimeout(() => {
+                    target.classList.remove('visible');
+                    info.innerText = "VÄNTA...";
+                }, 3000);
+            }, 7000);
+        }
+
+        function checkHit() {
+            if (target.classList.contains('visible')) {
+                info.innerText = "TRÄFF!";
+                target.style.filter = "sepia(1) saturate(5) hue-rotate(90deg)";
+                setTimeout(() => { target.style.filter = ""; }, 500);
+            } else {
+                info.innerText = "BOM (Tavlan var inte framme)";
+            }
+        }
+    </script>
+</body>
+</html>

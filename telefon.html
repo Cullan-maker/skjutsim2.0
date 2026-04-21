@@ -2,131 +2,71 @@
 <html lang="sv">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Kontroll (Telefon)</title>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Vapen-Sensor</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <style>
-        body { margin: 0; background: #000; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100dvh; }
-        
-        #setupScreen { display: flex; flex-direction: column; align-items: center; gap: 15px; }
-        input { font-size: 30px; text-align: center; width: 200px; padding: 10px; border-radius: 10px; border: 2px solid #4CAF50; background: #111; color: white;}
-        
-        #controlScreen { display: none; width: 100%; height: 100%; flex-direction: column; padding: 20px; box-sizing: border-box;}
-        button { padding: 20px; font-size: 20px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; color: white;}
-        
-        .btn-green { background: #2e7d32; }
-        .btn-red { background: #c62828; flex-grow: 1; font-size: 40px; margin-top: 15px;}
-        
-        #status { font-size: 14px; color: #888; text-align: center; margin-top: 10px; }
+        body { background: #222; color: white; font-family: sans-serif; text-align: center; padding: 20px; }
+        button { background: #4CAF50; color: white; border: none; padding: 20px; font-size: 20px; border-radius: 10px; width: 100%; margin-bottom: 20px; }
+        #mic-indicator { width: 100%; height: 20px; background: #444; margin: 10px 0; border-radius: 10px; overflow: hidden; }
+        #mic-level { height: 100%; width: 0%; background: lime; transition: width 0.1s; }
     </style>
 </head>
 <body>
-
-    <div id="setupScreen">
-        <h2>Ange koden från datorn</h2>
-        <input type="number" id="roomCodeInput" placeholder="1234">
-        <button class="btn-green" id="connectBtn">ANSLUT TILL DATORN</button>
-        <div id="status">Väntar på kod...</div>
-    </div>
-
-    <div id="controlScreen">
-        <h2 style="text-align: center; color:#00FF00;">ANSLUTEN!</h2>
-        <p style="text-align: center; color:#888;">Rikta vapnet mot mitten av skärmen och tryck Kalibrera.</p>
-        
-        <button class="btn-green" id="calibBtn">KALIBRERA & AKTIVERA MIKROFON</button>
-        <button class="btn-red" id="fireBtn">NÖD-AVFYRNING (SKÄRM)</button>
-        <div id="micStatus" style="text-align:center; margin-top:10px; color:#aaa;"></div>
-    </div>
+    <h2>Vapen-Sensor</h2>
+    <button id="startBtn">1. Aktivera Sensorer</button>
+    <div id="status">Status: Ej redo</div>
+    <div id="mic-indicator"><div id="mic-level"></div></div>
+    <p>Känslighet: <input type="range" id="threshold" min="0" max="255" value="150"></p>
 
     <script>
-        const peer = new Peer();
-        let conn = null;
-        let isAiming = false;
-        let startA = null, startB = null, startG = null;
-        
-        let micCtx, analyser, micStream, lastFire = 0;
+        const MY_ID = "min_unika_simulator_123"; // MÅSTE VARA SAMMA SOM PÅ DATORN
+        let client, audioContext, analyser, dataArray;
+        const startBtn = document.getElementById('startBtn');
+        const micLevel = document.getElementById('mic-level');
+        const thresholdInput = document.getElementById('threshold');
 
-        // Anslutnings-logik
-        document.getElementById('connectBtn').onclick = () => {
-            const code = document.getElementById('roomCodeInput').value;
-            document.getElementById('status').innerText = "Ansluter...";
-            
-            conn = peer.connect('banan-' + code);
-            
-            conn.on('open', () => {
-                document.getElementById('setupScreen').style.display = 'none';
-                document.getElementById('controlScreen').style.display = 'flex';
-                // Hindra skärmen från att slockna (Wake Lock API)
-                if('wakeLock' in navigator) navigator.wakeLock.request('screen');
-            });
-        };
+        async function init() {
+            // 1. MQTT Koppling
+            client = new Paho.MQTT.Client("broker.hivemq.com", Number(8000), "phone_" + Math.random());
+            client.connect({ onSuccess: () => { document.getElementById('status').innerText = "Kopplad till datorn!"; }});
 
-        // Gyro-logik (Skickar X/Y till datorn över nätverket)
-        window.addEventListener('deviceorientation', e => {
-            if(!isAiming || !conn) return;
-            if(startA === null) { startA=e.alpha; startB=e.beta; startG=e.gamma; }
-            
-            // Vi utgår från "Sidan"-montering här, går att bygga ut som tidigare
-            let dx = e.gamma - startG;
-            let dy = e.alpha - startA;
-            if (dx > 180) dx -= 360; if (dx < -180) dx += 360;
-            
-            let rawX = 300 + (dx * 20); 
-            let rawY = 300 - (dy * 20);
-            
-            // Skicka siktet till datorn! 60fps
-            conn.send({ type: 'aim', x: rawX, y: rawY });
-        });
+            // 2. Ljud-analys
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            audioContext = new AudioContext();
+            const source = audioContext.createMediaStreamSource(stream);
+            analyser = audioContext.createAnalyser();
+            source.connect(analyser);
+            dataArray = new Uint8Array(analyser.frequencyBinCount);
 
-        // Kalibrera & Mikrofon
-        document.getElementById('calibBtn').onclick = async () => {
-            if(typeof DeviceOrientationEvent !== 'undefined' && DeviceOrientationEvent.requestPermission) {
+            // 3. Sensor-tillstånd (iOS)
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
                 await DeviceOrientationEvent.requestPermission();
             }
-            startA = null; isAiming = true;
-            document.getElementById('calibBtn').innerText = "KALIBRERA OM";
-            
-            // Starta Mic för akustisk avfyrning
-            if(!micStream) {
-                try {
-                    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    micCtx = new (window.AudioContext || window.webkitAudioContext)();
-                    const source = micCtx.createMediaStreamSource(micStream);
-                    analyser = micCtx.createAnalyser();
-                    source.connect(analyser);
-                    listenMic();
-                } catch(e) { document.getElementById('micStatus').innerText = "Mic nekad. Använd skärm-knapp."; }
-            }
-        };
 
-        function listenMic() {
-            if(!isAiming) { requestAnimationFrame(listenMic); return; }
-            const dataArray = new Uint8Array(analyser.frequencyBinCount);
-            analyser.getByteTimeDomainData(dataArray);
-            let maxVol = 0;
-            for(let i=0; i<dataArray.length; i++) {
-                let v = Math.abs(dataArray[i] - 128);
-                if(v > maxVol) maxVol = v;
-            }
-            let volLevel = maxVol / 128;
-            document.getElementById('micStatus').innerText = `Mic Volym: ${(volLevel*100).toFixed(0)}%`;
-
-            // Avfyra om det klickar/smäller!
-            if (volLevel > 0.5 && Date.now() - lastFire > 1000) {
-                fireCommand();
-            }
-            requestAnimationFrame(listenMic);
+            detectSound();
         }
 
-        document.getElementById('fireBtn').onclick = fireCommand;
+        function detectSound() {
+            analyser.getByteFrequencyData(dataArray);
+            let maxVol = Math.max(...dataArray);
+            micLevel.style.width = (maxVol / 2.55) + "%";
 
-        function fireCommand() {
-            if(conn) {
-                conn.send({ type: 'fire' }); // Säg till datorn att det small
-                lastFire = Date.now();
-                if(navigator.vibrate) navigator.vibrate(80); // Fysisk rekyl i handen
+            if (maxVol > thresholdInput.value) {
+                sendShot();
             }
+            requestAnimationFrame(detectSound);
         }
+
+        function sendShot() {
+            const message = new Paho.MQTT.Message("BANG");
+            message.destinationName = MY_ID;
+            client.send(message);
+            document.body.style.background = "red";
+            setTimeout(() => { document.body.style.background = "#222"; }, 100);
+        }
+
+        startBtn.addEventListener('click', init);
     </script>
 </body>
 </html>
