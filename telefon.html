@@ -2,38 +2,45 @@
 <html lang="sv">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AR Glock-Sikte</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, orientation=landscape">
+    <title>AR Glock-Sikte (Liggande)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <style>
-        body { margin: 0; background: #000; color: white; font-family: sans-serif; overflow: hidden; text-align: center; }
+        body { margin: 0; background: #000; color: white; font-family: sans-serif; overflow: hidden; text-align: center; height: 100vh; width: 100vw; }
         
         /* Bakgrundskamera */
-        #camera-stream { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; object-fit: cover; z-index: 1; }
+        #camera-stream { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
         
         /* Canvas för Spår (Trace) */
-        #traceCanvas { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2; pointer-events: none; }
+        #traceCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
 
         /* UI och Knappar överst */
-        #ui-layer { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 10; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; }
         
-        .panel { background: rgba(0,0,0,0.7); padding: 10px; pointer-events: auto; }
+        /* Justering för liggande läge: paneler på sidorna eller mindre topp/botten */
+        .panel { background: rgba(0,0,0,0.7); padding: 10px; pointer-events: auto; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px; }
         
-        button { background: #4CAF50; color: white; border: none; padding: 15px; font-size: 18px; border-radius: 8px; width: 90%; margin: 5px; font-weight: bold; cursor: pointer; }
+        button { background: #4CAF50; color: white; border: none; padding: 10px 20px; font-size: 16px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        button:active { background: #45a049; }
         #calBtn { background: #2196F3; display: none; }
         
-        /* --- GLOCK SIKTET (Virtuellt) --- */
-        #sight-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5; pointer-events: none; width: 150px; height: 100px; }
-        /* Bakre siktet (U-skåran med vit linje) */
-        .rear-sight { position: absolute; bottom: 0; left: 0; width: 150px; height: 40px; background: #222; border-top: 3px solid white; clip-path: polygon(0 0, 40px 0, 40px 100%, 110px 100%, 110px 0, 150px 0, 150px 100%, 0 100%); }
-        /* Främre siktet (Korn med vit prick) */
-        .front-sight { position: absolute; bottom: 20px; left: 65px; width: 20px; height: 50px; background: #111; }
-        .front-dot { position: absolute; top: 5px; left: 5px; width: 10px; height: 10px; background: white; border-radius: 50%; box-shadow: 0 0 5px rgba(255,255,255,0.8); }
+        /* --- GLOCK SIKTET (Virtuellt) - NYA LINJERADE POSITIONER --- */
+        #sight-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5; pointer-events: none; width: 160px; height: 120px; }
+        
+        /* Bakre siktet (U-skåran med vit linje) - Justerad höjd och form */
+        .rear-sight { position: absolute; bottom: 0; left: 0; width: 160px; height: 60px; background: #222; border-top: 4px solid white; clip-path: polygon(0 0, 55px 0, 55px 100%, 105px 100%, 105px 0, 160px 0, 160px 100%, 0 100%); }
+        
+        /* Främre siktet (Korn med vit prick) - Positionerad för perfekt linjering */
+        .front-sight { position: absolute; bottom: 30px; /* Höjd för att linjera med skåran */ left: 70px; /* Centrerad i 160px bredd (160/2 - 20/2) */ width: 20px; height: 70px; background: #111; }
+        .front-dot { position: absolute; top: 8px; left: 5px; width: 10px; height: 10px; background: white; border-radius: 50%; box-shadow: 0 0 5px rgba(255,255,255,0.8); }
 
-        #mic-indicator { width: 90%; height: 20px; background: #444; margin: 10px auto; border-radius: 5px; position: relative; }
+        #mic-panel { display: none; flex-direction: column; align-items: center; width: 100%; }
+        #mic-indicator { width: 80%; height: 15px; background: #444; margin: 5px auto; border-radius: 5px; position: relative; }
         #mic-level { height: 100%; width: 0%; background: #00FF00; transition: width 0.05s; }
         #threshold-line { position: absolute; top: 0; bottom: 0; width: 2px; background: red; z-index: 10; left: 60%; }
-        input[type=range] { width: 90%; }
+        input[type=range] { width: 80%; margin: 0; }
+        
+        #status { font-size: 14px; margin: 0; }
     </style>
 </head>
 <body>
@@ -49,13 +56,13 @@
 
     <div id="ui-layer">
         <div class="panel">
-            <h3 style="margin:0 0 5px 0;">AR Vapen-Sensor</h3>
-            <div id="status">Klicka Start för kamera & mikrofon</div>
-            <button id="startBtn">STARTA AR-LÄGE</button>
-            <button id="calBtn">KALIBRERA (Sikta på mitten av skärmen)</button>
+            <h4 style="margin:0;">AR Glock (Landscape)</h4>
+            <div id="status">Klicka Start för AR</div>
+            <button id="startBtn">STARTA AR</button>
+            <button id="calBtn">KALIBRERA (Sikta mot skärmcenter)</button>
         </div>
 
-        <div class="panel" id="mic-panel" style="display: none;">
+        <div class="panel" id="mic-panel">
             <div id="mic-indicator"><div id="mic-level"></div><div id="threshold-line"></div></div>
             <input type="range" id="threshold" min="0" max="255" value="150">
         </div>
@@ -90,16 +97,14 @@
 
         async function initSystem() {
             try {
-                startBtn.innerText = "Laddar kamera och mic...";
-                
-                // 1. Begär både Kamera och Mikrofon (Kamera vänd bort från användaren)
+                // Begär både Kamera och Mikrofon
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     audio: true, 
                     video: { facingMode: "environment" } 
                 });
                 video.srcObject = stream;
 
-                // 2. Starta Ljudanalys
+                // Starta Ljudanalys
                 const AudioCtx = window.AudioContext || window.webkitAudioContext;
                 audioContext = new AudioCtx();
                 if(audioContext.state === 'suspended') audioContext.resume();
@@ -109,21 +114,21 @@
                 source.connect(analyser);
                 dataArray = new Uint8Array(analyser.frequencyBinCount);
 
-                // 3. Begär Gyroskop (iOS krav)
+                // Begär Gyroskop (iOS krav)
                 if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                     const perm = await DeviceOrientationEvent.requestPermission();
                     if (perm !== 'granted') throw new Error("Gyroskop nekat.");
                 }
 
-                // 4. MQTT Koppling
+                // MQTT Koppling - ANVÄNDER SÄKER PORT 8884
                 client = new Paho.MQTT.Client("broker.hivemq.com", Number(8884), "phone_" + Math.random().toString(16).substr(2, 8));
                 client.connect({ 
                     useSSL: true,
                     onSuccess: () => { 
-                        statusEl.innerHTML = "<span style='color:lime'>Ansluten! Kalibrera vapnet mot skärmen.</span>";
+                        statusEl.innerHTML = "<span style='color:lime'>Ansluten! Kalibrera.</span>";
                         startBtn.style.display = "none";
-                        calBtn.style.display = "block";
-                        document.getElementById('mic-panel').style.display = "block";
+                        calBtn.style.display = "inline-block";
+                        document.getElementById('mic-panel').style.display = "flex";
                         document.getElementById('sight-container').style.display = "block";
                         
                         window.addEventListener('deviceorientation', handleOrientation);
@@ -138,43 +143,42 @@
         }
 
         // --- KALIBRERING ---
-        // Sätter nollpunkten dit du pekar just nu
         calBtn.addEventListener('click', () => {
-            startAlpha = null; // Tvingar nästa gyro-uppdatering att bli den nya nollpunkten
+            startAlpha = null; 
             trace = [];
-            statusEl.innerHTML = "<span style='color:lime'>Kalibrerad! Redo att skjuta.</span>";
+            statusEl.innerHTML = "<span style='color:lime'>Kalibrerad! Skjut.</span>";
         });
 
         function handleOrientation(event) {
             if (startAlpha === null) { 
                 startAlpha = event.alpha; startBeta = event.beta; startGamma = event.gamma; 
             }
-            // Räkna ut skillnaden från när vi kalibrerade
-            let deltaAlpha = event.alpha - startAlpha;
-            let deltaBeta = event.beta - startBeta;
             
-            // Hantera kompass-hopp
-            if (deltaAlpha > 180) deltaAlpha -= 360; 
-            if (deltaAlpha < -180) deltaAlpha += 360;
+            // Justering för liggande läge:
+            // I liggande blir 'gamma' ofta sidled (roll) och 'alpha' eller 'beta' höjdled beroende på rotation.
+            // Denna setup förutsätter att telefonen hålls med hemknappen till höger.
+            let deltaX = event.gamma - startGamma;
+            let deltaY = event.alpha - startAlpha;
+            
+            // Hantera kompass-hopp för sidled
+            if (deltaY > 180) deltaY -= 360; 
+            if (deltaY < -180) deltaY += 360;
 
-            // Beroende på om telefonen står upp eller ligger ner kan dessa behöva kastas om, 
-            // men detta är standard för stående "Portrait"-läge:
-            currentX = deltaAlpha; 
-            currentY = deltaBeta;
+            // Mappa till simulatorns koordinater
+            currentX = deltaX; 
+            currentY = deltaY;
         }
 
-        // --- RITA GYRO-SPÅRET PÅ SKÄRMEN ---
+        // --- RITA GYRO-SPÅRET ---
         function drawLoop() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // Lägg till i spåret (behåll max 30 punkter för en "svans")
             trace.push({ x: currentX, y: currentY });
             if (trace.length > 30) trace.shift();
 
-            // Rita spåret (vi ritar det från mitten av skärmen)
             ctx.beginPath();
             ctx.lineWidth = 4;
-            ctx.strokeStyle = "rgba(0, 255, 0, 0.8)"; // Grön laserlinje
+            ctx.strokeStyle = "rgba(0, 255, 0, 0.8)"; 
             
             for (let i = 0; i < trace.length; i++) {
                 // Konvertera vinkel till pixlar för skärmvisning (multiplicera med känslighet)
@@ -204,14 +208,14 @@
         function fireShot() {
             isReadyToShoot = false;
             
-            // Skicka datan till datorskärmen! Inkludera våra gyro-koordinater.
+            // Skicka datan till datorskärmen
             const payload = JSON.stringify({ action: "BANG", x: currentX, y: currentY });
             const message = new Paho.MQTT.Message(payload);
             message.destinationName = MY_ID;
             client.send(message);
             
-            // Blixtra till skärmen som rekyl
-            document.getElementById('ui-layer').style.background = "rgba(255,0,0,0.5)";
+            // GRÖN blixt på skärmen som rekyl
+            document.getElementById('ui-layer').style.background = "rgba(0,255,0,0.5)";
             setTimeout(() => { document.getElementById('ui-layer').style.background = "transparent"; isReadyToShoot = true; }, 400);
         }
 
