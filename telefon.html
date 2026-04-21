@@ -3,36 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, orientation=landscape">
-    <title>AR Glock-Sikte (Liggande)</title>
+    <title>AR Glock - Siktesdisciplin</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <style>
         body { margin: 0; background: #000; color: white; font-family: sans-serif; overflow: hidden; text-align: center; height: 100vh; width: 100vw; }
         
-        /* Bakgrundskamera */
         #camera-stream { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
-        
-        /* Canvas för Spår (Trace) */
         #traceCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
-
-        /* UI och Knappar överst */
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; }
         
-        /* Justering för liggande läge: paneler på sidorna eller mindre topp/botten */
         .panel { background: rgba(0,0,0,0.7); padding: 10px; pointer-events: auto; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px; }
-        
         button { background: #4CAF50; color: white; border: none; padding: 10px 20px; font-size: 16px; border-radius: 8px; font-weight: bold; cursor: pointer; }
         button:active { background: #45a049; }
         #calBtn { background: #2196F3; display: none; }
         
-        /* --- GLOCK SIKTET (Virtuellt) - NYA LINJERADE POSITIONER --- */
+        /* --- GLOCK SIKTET --- */
         #sight-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5; pointer-events: none; width: 160px; height: 120px; }
-        
-        /* Bakre siktet (U-skåran med vit linje) - Justerad höjd och form */
         .rear-sight { position: absolute; bottom: 0; left: 0; width: 160px; height: 60px; background: #222; border-top: 4px solid white; clip-path: polygon(0 0, 55px 0, 55px 100%, 105px 100%, 105px 0, 160px 0, 160px 100%, 0 100%); }
         
-        /* Främre siktet (Korn med vit prick) - Positionerad för perfekt linjering */
-        .front-sight { position: absolute; bottom: 30px; /* Höjd för att linjera med skåran */ left: 70px; /* Centrerad i 160px bredd (160/2 - 20/2) */ width: 20px; height: 70px; background: #111; }
-        .front-dot { position: absolute; top: 8px; left: 5px; width: 10px; height: 10px; background: white; border-radius: 50%; box-shadow: 0 0 5px rgba(255,255,255,0.8); }
+        /* Främre siktet (Nu med animation för att glida runt) */
+        .front-sight { 
+            position: absolute; bottom: 30px; left: 70px; width: 20px; height: 70px; background: #111;
+            /* Snabb transition för mjuk men responsiv rörelse */
+            transition: transform 0.05s linear; 
+        }
+        .front-dot { 
+            position: absolute; top: 8px; left: 5px; width: 10px; height: 10px; 
+            background: white; border-radius: 50%; box-shadow: 0 0 5px rgba(255,255,255,0.8); 
+            transition: background 0.2s; /* För färgbytet vid fel */
+        }
 
         #mic-panel { display: none; flex-direction: column; align-items: center; width: 100%; }
         #mic-indicator { width: 80%; height: 15px; background: #444; margin: 5px auto; border-radius: 5px; position: relative; }
@@ -46,20 +45,19 @@
 <body>
 
     <video id="camera-stream" autoplay playsinline muted></video>
-    
     <canvas id="traceCanvas"></canvas>
 
     <div id="sight-container" style="display: none;">
-        <div class="front-sight"><div class="front-dot"></div></div>
+        <div class="front-sight" id="front-sight"><div class="front-dot" id="front-dot"></div></div>
         <div class="rear-sight"></div>
     </div>
 
     <div id="ui-layer">
         <div class="panel">
-            <h4 style="margin:0;">AR Glock (Landscape)</h4>
+            <h4 style="margin:0;">AR Glock Pro</h4>
             <div id="status">Klicka Start för AR</div>
-            <button id="startBtn">STARTA AR</button>
-            <button id="calBtn">KALIBRERA (Sikta mot skärmcenter)</button>
+            <button id="startBtn">STARTA</button>
+            <button id="calBtn">KALIBRERA (Sikta mot center)</button>
         </div>
 
         <div class="panel" id="mic-panel">
@@ -74,10 +72,14 @@
         let client, audioContext, analyser, dataArray;
         let isReadyToShoot = true;
         
-        // Gyrovariabler
         let startAlpha = null, startBeta = null, startGamma = null;
         let currentX = 0, currentY = 0;
         let trace = [];
+
+        // Nya variabler för siktes-fysik
+        let lastX = 0, lastY = 0;
+        let sightOffsetX = 0, sightOffsetY = 0;
+        let isSightAligned = false;
 
         const startBtn = document.getElementById('startBtn');
         const calBtn = document.getElementById('calBtn');
@@ -85,8 +87,9 @@
         const video = document.getElementById('camera-stream');
         const canvas = document.getElementById('traceCanvas');
         const ctx = canvas.getContext('2d');
+        const frontSight = document.getElementById('front-sight');
+        const frontDot = document.getElementById('front-dot');
 
-        // Hantera fönsterstorlek för canvas
         function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
@@ -97,14 +100,9 @@
 
         async function initSystem() {
             try {
-                // Begär både Kamera och Mikrofon
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    audio: true, 
-                    video: { facingMode: "environment" } 
-                });
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: { facingMode: "environment" } });
                 video.srcObject = stream;
 
-                // Starta Ljudanalys
                 const AudioCtx = window.AudioContext || window.webkitAudioContext;
                 audioContext = new AudioCtx();
                 if(audioContext.state === 'suspended') audioContext.resume();
@@ -114,13 +112,11 @@
                 source.connect(analyser);
                 dataArray = new Uint8Array(analyser.frequencyBinCount);
 
-                // Begär Gyroskop (iOS krav)
                 if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                     const perm = await DeviceOrientationEvent.requestPermission();
                     if (perm !== 'granted') throw new Error("Gyroskop nekat.");
                 }
 
-                // MQTT Koppling - ANVÄNDER SÄKER PORT 8884
                 client = new Paho.MQTT.Client("broker.hivemq.com", Number(8884), "phone_" + Math.random().toString(16).substr(2, 8));
                 client.connect({ 
                     useSSL: true,
@@ -136,64 +132,74 @@
                         drawLoop();
                     }
                 });
-
-            } catch (error) {
-                alert("Fel: " + error.message + "\nSe till att länken är HTTPS.");
-            }
+            } catch (error) { alert("Fel: " + error.message); }
         }
 
-        // --- KALIBRERING ---
         calBtn.addEventListener('click', () => {
-            startAlpha = null; 
-            trace = [];
-            statusEl.innerHTML = "<span style='color:lime'>Kalibrerad! Skjut.</span>";
+            startAlpha = null; trace = [];
+            statusEl.innerHTML = "<span style='color:lime'>Kalibrerad!</span>";
         });
 
         function handleOrientation(event) {
             if (startAlpha === null) { 
                 startAlpha = event.alpha; startBeta = event.beta; startGamma = event.gamma; 
             }
-            
-            // Justering för liggande läge:
-            // I liggande blir 'gamma' ofta sidled (roll) och 'alpha' eller 'beta' höjdled beroende på rotation.
-            // Denna setup förutsätter att telefonen hålls med hemknappen till höger.
             let deltaX = event.gamma - startGamma;
             let deltaY = event.alpha - startAlpha;
-            
-            // Hantera kompass-hopp för sidled
             if (deltaY > 180) deltaY -= 360; 
             if (deltaY < -180) deltaY += 360;
 
-            // Mappa till simulatorns koordinater
             currentX = deltaX; 
             currentY = deltaY;
         }
 
-        // --- RITA GYRO-SPÅRET ---
         function drawLoop() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
             trace.push({ x: currentX, y: currentY });
             if (trace.length > 30) trace.shift();
 
+            // --- FYSIK FÖR SIKTET (Nytt!) ---
+            // Räkna ut hur snabbt pistolen rör sig (Hastighet)
+            let velocityX = currentX - lastX;
+            let velocityY = currentY - lastY;
+
+            // Låt siktet "släpa efter" rörelsen
+            // Går vi uppåt, dras siktet nedåt (tröghet). Multiplicera med 8 för känslighet.
+            let targetOffsetX = -(velocityX * 8);
+            let targetOffsetY = -(velocityY * 8);
+
+            // Mjuka upp rörelsen så den fjädrar tillbaka till mitten
+            sightOffsetX += (targetOffsetX - sightOffsetX) * 0.3;
+            sightOffsetY += (targetOffsetY - sightOffsetY) * 0.3;
+
+            // Spara position för nästa runda
+            lastX = currentX;
+            lastY = currentY;
+
+            // Flytta det grafiska siktet på skärmen
+            frontSight.style.transform = `translate(${sightOffsetX}px, ${sightOffsetY}px)`;
+
+            // Kolla om siktet är inom "godkänd" linjering (mindre än 10 pixlar ur centrum)
+            isSightAligned = Math.abs(sightOffsetX) < 10 && Math.abs(sightOffsetY) < 10;
+            
+            // Byt färg på pricken
+            frontDot.style.background = isSightAligned ? "white" : "#f44336";
+            frontDot.style.boxShadow = isSightAligned ? "0 0 5px rgba(255,255,255,0.8)" : "none";
+
+            // Rita gröna gyro-spåret
             ctx.beginPath();
             ctx.lineWidth = 4;
-            ctx.strokeStyle = "rgba(0, 255, 0, 0.8)"; 
-            
+            ctx.strokeStyle = "rgba(0, 255, 0, 0.5)"; 
             for (let i = 0; i < trace.length; i++) {
-                // Konvertera vinkel till pixlar för skärmvisning (multiplicera med känslighet)
                 let px = (canvas.width / 2) + (trace[i].x * 15);
                 let py = (canvas.height / 2) + (trace[i].y * 15);
-                
-                if (i === 0) ctx.moveTo(px, py);
-                else ctx.lineTo(px, py);
+                if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
             }
             ctx.stroke();
 
             requestAnimationFrame(drawLoop);
         }
 
-        // --- LJUDSENSOR & SKJUT ---
         function detectSound() {
             analyser.getByteFrequencyData(dataArray);
             let maxVol = Math.max(...dataArray);
@@ -208,14 +214,27 @@
         function fireShot() {
             isReadyToShoot = false;
             
-            // Skicka datan till datorskärmen
-            const payload = JSON.stringify({ action: "BANG", x: currentX, y: currentY });
+            // Om siktet INTE är linjerat, straffar vi spelaren genom att dra skottet
+            let finalX = currentX;
+            let finalY = currentY;
+
+            if (!isSightAligned) {
+                statusEl.innerHTML = "<span style='color:red; font-weight:bold;'>SIKTFEL! För ryckigt.</span>";
+                // Lägger till ett stort fel (bommar garanterat måltavlan)
+                finalX += (Math.random() > 0.5 ? 20 : -20); 
+                finalY -= 20; // Drar alltid skottet lågt/högt
+            } else {
+                statusEl.innerHTML = "<span style='color:lime'>Bra avfyrning!</span>";
+            }
+
+            // Skicka till datorn
+            const payload = JSON.stringify({ action: "BANG", x: finalX, y: finalY });
             const message = new Paho.MQTT.Message(payload);
             message.destinationName = MY_ID;
             client.send(message);
             
-            // GRÖN blixt på skärmen som rekyl
-            document.getElementById('ui-layer').style.background = "rgba(0,255,0,0.5)";
+            // GRÖN blixt vid bra skott, RÖD blixt vid dåligt sikte
+            document.getElementById('ui-layer').style.background = isSightAligned ? "rgba(0,255,0,0.5)" : "rgba(255,0,0,0.5)";
             setTimeout(() => { document.getElementById('ui-layer').style.background = "transparent"; isReadyToShoot = true; }, 400);
         }
 
