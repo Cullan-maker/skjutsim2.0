@@ -122,18 +122,20 @@
                     }
                 });
 
-            } catch (error) {
+          } catch (error) {
                 console.error(error);
-                let errorMessage = "Ett okänt fel uppstod.";
                 
-                if (error.name === "NotAllowedError" || error.message.includes("Permission denied")) {
-                    errorMessage = "Du nekade åtkomst till mikrofonen, eller så har telefonen blockerat det. Ladda om sidan och tillåt åtkomst.";
-                } else if (location.protocol !== 'https:') {
-                    errorMessage = "Mikrofonen blockeras eftersom du inte använder en säker anslutning (HTTPS). Ladda upp filen till GitHub Pages först!";
-                }
-
-                statusBox.innerHTML = `<span style='color: #f44336;'><b>Fel:</b> ${errorMessage}</span>`;
-                startBtn.innerText = "1. Aktivera Systemet";
+                // SKRIV UT DET EXAKTA TEKNISKA FELET PÅ SKÄRMEN
+                statusBox.innerHTML = `
+                    <span style='color: #f44336;'>
+                        <b>Tekniskt Fel!</b><br>
+                        Namn: ${error.name}<br>
+                        Meddelande: ${error.message}
+                    </span>
+                `;
+                
+                startBtn.innerText = "Försök Igen";
+                startBtn.style.display = "block";
             }
         }
 
