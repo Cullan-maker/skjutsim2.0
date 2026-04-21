@@ -104,16 +104,19 @@
 
                 statusBox.innerHTML = "Mikrofon OK. Ansluter till nätverket...";
 
-                // 2. Koppla upp mot molnet (MQTT)
+               // 2. Koppla upp mot molnet (MQTT)
                 const randomClientId = "phone_" + Math.random().toString(16).substring(2, 10);
-                client = new Paho.MQTT.Client("broker.hivemq.com", Number(8000), randomClientId);
+                
+                // ÄNDRAD TILL PORT 8884
+                client = new Paho.MQTT.Client("broker.hivemq.com", Number(8884), randomClientId);
                 
                 client.connect({ 
+                    useSSL: true, // LÄGG TILL DENNA RAD FÖR SÄKERHET!
                     onSuccess: () => { 
                         statusBox.innerHTML = "<span style='color: #4CAF50; font-weight: bold;'>Kopplad och Klar!</span><br>Rikta mot skärmen och tryck av.";
-                        startBtn.style.display = "none"; // Göm startknappen
-                        testBtn.style.display = "block"; // Visa manuella skjutknappen
-                        detectSound(); // Starta lyssnandet!
+                        startBtn.style.display = "none";
+                        testBtn.style.display = "block";
+                        detectSound();
                     },
                     onFailure: (err) => {
                         statusBox.innerHTML = "<span style='color: red;'>Nätverksfel: Kunde inte ansluta till servern.</span>";
