@@ -3,34 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, orientation=landscape">
-    <title>Glock AR - Struket Korn</title>
+    <title>AR Vapensensor</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <style>
         body { margin: 0; background: #000; color: white; font-family: sans-serif; overflow: hidden; text-align: center; height: 100vh; width: 100vw; }
         
         #camera-stream { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
-        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; transition: background 0.1s; }
         
         .panel { background: rgba(0,0,0,0.85); padding: 15px; pointer-events: auto; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px; }
         button { background: #4CAF50; color: white; border: none; padding: 15px 25px; font-size: 18px; border-radius: 8px; font-weight: bold; cursor: pointer; }
         #calBtn { background: #2196F3; display: none; }
         
-        /* --- VERKLIGHETSTROGET SIKTE (Struket korn) --- */
+        /* --- SIKTE --- */
         #sight-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5; pointer-events: none; width: 200px; height: 120px; }
         
-        /* Bakre siktet (Bredare, lägre skåra) */
-        .rear-sight { position: absolute; bottom: 0; left: 0; width: 200px; height: 50px; background: #111; border-top: 3px solid #666; clip-path: polygon(0 0, 75px 0, 75px 100%, 125px 100%, 125px 0, 200px 0, 200px 100%, 0 100%); }
+        /* Bakre skåran */
+        .rear-sight { position: absolute; bottom: 0; left: 0; width: 200px; height: 50px; background: #111; border-top: 3px solid #555; clip-path: polygon(0 0, 75px 0, 75px 100%, 125px 100%, 125px 0, 200px 0, 200px 100%, 0 100%); }
         
-        /* Främre siktet (Kornet). Fjädrar runt beroende på tröghet */
+        /* Främre kornet */
         .front-sight { 
-            position: absolute; bottom: 0px; left: 88px; /* Centrerad (200/2 - 24/2) */
+            position: absolute; bottom: 0px; left: 88px;
             width: 24px; height: 65px; background: #222; border-top: 2px solid #555;
             transition: transform 0.05s linear; 
         }
         .front-dot { 
             position: absolute; top: 5px; left: 6px; width: 12px; height: 12px; 
-            background: white; border-radius: 50%; box-shadow: 0 0 5px rgba(255,255,255,0.5); transition: background 0.2s;
+            background: #888; border-radius: 50%; transition: background 0.2s, box-shadow 0.2s;
         }
+
+        /* När siktet är perfekt linjerat */
+        .dot-aligned { background: white !important; box-shadow: 0 0 6px rgba(255,255,255,0.8); }
 
         #status { font-size: 16px; margin: 0; color: #ff9800; font-weight: bold; }
     </style>
@@ -46,10 +49,10 @@
 
     <div id="ui-layer">
         <div class="panel" id="top-panel">
-            <h3 style="margin:0;">Glock AR Pro</h3>
-            <div id="status">Klicka Start för helskärm & AR</div>
+            <h3 style="margin:0;">Vapensensor</h3>
+            <div id="status">Klicka Start</div>
             <button id="startBtn">STARTA</button>
-            <button id="calBtn">KALIBRERA (Sikta mot center)</button>
+            <button id="calBtn">KALIBRERA CENTRUM</button>
         </div>
         
         <input type="range" id="threshold" min="0" max="255" value="150" style="position: absolute; bottom: 20px; left: 10%; width: 80%; pointer-events: auto; opacity: 0.5;">
@@ -60,15 +63,12 @@
 
         let client, audioContext, analyser, dataArray;
         let isReadyToShoot = true;
-        
         let startAlpha = null, startBeta = null, startGamma = null;
         let currentX = 0, currentY = 0;
-        let traceHistory = []; // Sparar positioner för grafen
+        let traceHistory = []; 
 
-        // Fysik för struket korn
         let lastX = 0, lastY = 0;
         let sightOffsetX = 0, sightOffsetY = 0;
-        let isSightAligned = false;
 
         const startBtn = document.getElementById('startBtn');
         const calBtn = document.getElementById('calBtn');
@@ -78,13 +78,19 @@
         const frontDot = document.getElementById('front-dot');
 
         async function initSystem() {
+            startBtn.innerText = "Laddar...";
+            
             try {
-                // Tvinga Helskärm
                 if (document.documentElement.requestFullscreen) {
-                    await document.documentElement.requestFullscreen();
+                    document.documentElement.requestFullscreen().catch(e => console.log("Helskärm avstängt"));
                 }
+            } catch(e) {}
 
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: { facingMode: "environment" } });
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: true, 
+                    video: { facingMode: { ideal: "environment" } } 
+                });
                 video.srcObject = stream;
 
                 const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -103,7 +109,7 @@
 
                 client = new Paho.MQTT.Client("broker.hivemq.com", Number(8884), "phone_" + Math.random().toString(16).substr(2, 8));
                 client.connect({ useSSL: true, onSuccess: () => { 
-                    statusEl.innerText = "Kalibrera mot skärmen.";
+                    statusEl.innerText = "Sikta och kalibrera";
                     statusEl.style.color = "lime";
                     startBtn.style.display = "none";
                     calBtn.style.display = "inline-block";
@@ -113,12 +119,15 @@
                     detectSound(); 
                     physicsLoop();
                 }});
-            } catch (error) { alert("Fel: " + error.message); }
+            } catch (error) { 
+                alert("Kamera/Mic fel: " + error.message); 
+                startBtn.innerText = "Försök igen";
+            }
         }
 
         calBtn.addEventListener('click', () => {
             startAlpha = null; traceHistory = [];
-            statusEl.innerText = "REDO! Struket korn krävs.";
+            statusEl.innerText = "Kalibrerad. Redo för skott.";
             statusEl.style.color = "white";
         });
 
@@ -136,32 +145,29 @@
         }
 
         function physicsLoop() {
-            // Spara data till grafen (max 30 senaste positionerna = ca 0.5 sek rörelse)
             traceHistory.push({ x: currentX, y: currentY });
             if (traceHistory.length > 30) traceHistory.shift();
 
-            // Räkna hastighet
             let velocityX = currentX - lastX;
             let velocityY = currentY - lastY;
 
-            // Känslighet för siktet. Y är höjdled, X är sidled.
-            let targetOffsetX = -(velocityX * 15);
-            let targetOffsetY = -(velocityY * 15);
+            let targetOffsetX = -(velocityX * 10);
+            let targetOffsetY = -(velocityY * 10);
 
-            sightOffsetX += (targetOffsetX - sightOffsetX) * 0.2; // Mjuk återgång
+            sightOffsetX += (targetOffsetX - sightOffsetX) * 0.2; 
             sightOffsetY += (targetOffsetY - sightOffsetY) * 0.2;
 
             lastX = currentX; lastY = currentY;
 
-            // Flytta grafiskt (Kornet).
             frontSight.style.transform = `translate(${sightOffsetX}px, ${sightOffsetY}px)`;
 
-            // Kontrollera om det är ett "Struket Korn" (Väldigt strikt: Max 5 pixlar fel)
-            // Det betyder att kornet varken får vara för högt, lågt eller snett i skåran.
-            isSightAligned = Math.abs(sightOffsetX) < 5 && Math.abs(sightOffsetY) < 5;
-            
-            frontDot.style.background = isSightAligned ? "white" : "#f44336";
-            frontDot.style.boxShadow = isSightAligned ? "0 0 5px white" : "none";
+            // Visuell indikation (ingen bestraffning, bara hjälp)
+            let isAligned = Math.abs(sightOffsetX) < 6 && Math.abs(sightOffsetY) < 6;
+            if(isAligned) {
+                frontDot.classList.add('dot-aligned');
+            } else {
+                frontDot.classList.remove('dot-aligned');
+            }
 
             requestAnimationFrame(physicsLoop);
         }
@@ -176,26 +182,19 @@
 
         function fireShot() {
             isReadyToShoot = false;
-            let finalX = currentX, finalY = currentY;
-
-            if (!isSightAligned) {
-                // Straff för dåligt sikte
-                finalX += (Math.random() > 0.5 ? 20 : -20); 
-                finalY -= 20; 
-            }
-
-            // Skicka ALLT till datorn (Skott + Gyro-grafen)
-            const payload = JSON.stringify({ action: "BANG", x: finalX, y: finalY, trace: traceHistory });
+            
+            // Skickar rena värden - Vinglar du, så blir det en ärlig bom!
+            const payload = JSON.stringify({ action: "BANG", x: currentX, y: currentY, trace: traceHistory });
             const message = new Paho.MQTT.Message(payload);
             message.destinationName = MY_ID;
             client.send(message);
             
-            document.getElementById('ui-layer').style.background = isSightAligned ? "rgba(0,255,0,0.5)" : "rgba(255,0,0,0.5)";
-            setTimeout(() => { document.getElementById('ui-layer').style.background = "transparent"; isReadyToShoot = true; }, 400);
+            // Neutral Mynningsflamma (Ljusgrå/Vit) istället för rött
+            document.getElementById('ui-layer').style.background = "rgba(255,255,255,0.3)";
+            setTimeout(() => { document.getElementById('ui-layer').style.background = "transparent"; isReadyToShoot = true; }, 150);
         }
 
         startBtn.addEventListener('click', initSystem);
     </script>
 </body>
-</html>
 </html>
