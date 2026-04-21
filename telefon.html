@@ -19,54 +19,83 @@
     <div id="mic-indicator"><div id="mic-level"></div></div>
     <p>Känslighet: <input type="range" id="threshold" min="0" max="255" value="150"></p>
 
-    <script>
-        const MY_ID = "min_unika_simulator_123"; // MÅSTE VARA SAMMA SOM PÅ DATORN
-        let client, audioContext, analyser, dataArray;
-        const startBtn = document.getElementById('startBtn');
-        const micLevel = document.getElementById('mic-level');
-        const thresholdInput = document.getElementById('threshold');
+ const MY_ID = "min_unika_simulator_123"; // MÅSTE VARA SAMMA SOM PÅ DATORN
+let client, audioContext, analyser, dataArray;
+const startBtn = document.getElementById('startBtn');
+const micLevel = document.getElementById('mic-level');
+const thresholdInput = document.getElementById('threshold');
+const statusText = document.getElementById('status');
 
-        async function init() {
-            // 1. MQTT Koppling
-            client = new Paho.MQTT.Client("broker.hivemq.com", Number(8000), "phone_" + Math.random());
-            client.connect({ onSuccess: () => { document.getElementById('status').innerText = "Kopplad till datorn!"; }});
+async function init() {
+    try {
+        statusText.innerText = "Startar sensorer...";
 
-            // 2. Ljud-analys
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            audioContext = new AudioContext();
-            const source = audioContext.createMediaStreamSource(stream);
-            analyser = audioContext.createAnalyser();
-            source.connect(analyser);
-            dataArray = new Uint8Array(analyser.frequencyBinCount);
+        // 1. Fråga om mikrofonen (Här stannar det ofta om det inte är HTTPS)
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        
+        // Kompatibilitet för både Apple och Android
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioContext = new AudioContext();
+        const source = audioContext.createMediaStreamSource(stream);
+        analyser = audioContext.createAnalyser();
+        source.connect(analyser);
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
 
-            // 3. Sensor-tillstånd (iOS)
-            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-                await DeviceOrientationEvent.requestPermission();
+        // 2. Fråga om gyroskop (Krävs för iOS 13+)
+        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+            const permission = await DeviceOrientationEvent.requestPermission();
+            if (permission !== 'granted') {
+                alert("Du avböjde rörelsesensorerna. Ladda om sidan och tillåt.");
+                return;
             }
-
-            detectSound();
         }
 
-        function detectSound() {
-            analyser.getByteFrequencyData(dataArray);
-            let maxVol = Math.max(...dataArray);
-            micLevel.style.width = (maxVol / 2.55) + "%";
-
-            if (maxVol > thresholdInput.value) {
-                sendShot();
+        // 3. Koppla till datorn via MQTT
+        statusText.innerText = "Kopplar till nätverket...";
+        client = new Paho.MQTT.Client("broker.hivemq.com", Number(8000), "phone_" + Math.random().toString(16).substr(2, 8));
+        
+        client.connect({ 
+            onSuccess: () => { 
+                statusText.innerText = "Kopplad! Redo att skjuta."; 
+                detectSound(); // Börja lyssna efter skott först nu!
+            },
+            onFailure: (err) => {
+                alert("Nätverksfel: Kunde inte koppla till datorn. Kolla internet.");
+                statusText.innerText = "Nätverksfel";
             }
-            requestAnimationFrame(detectSound);
-        }
+        });
 
-        function sendShot() {
-            const message = new Paho.MQTT.Message("BANG");
-            message.destinationName = MY_ID;
-            client.send(message);
-            document.body.style.background = "red";
-            setTimeout(() => { document.body.style.background = "#222"; }, 100);
-        }
+    } catch (error) {
+        // HÄR FÅNGAR VI FELET!
+        alert("Något gick fel!\n\nOrsak: " + error.message + "\n\nÄr du säker på att du surfar via en https-länk?");
+        statusText.innerText = "Fel: " + error.message;
+    }
+}
 
-        startBtn.addEventListener('click', init);
+function detectSound() {
+    analyser.getByteFrequencyData(dataArray);
+    let maxVol = Math.max(...dataArray);
+    micLevel.style.width = (maxVol / 2.55) + "%";
+
+    if (maxVol > thresholdInput.value) {
+        sendShot();
+    }
+    requestAnimationFrame(detectSound);
+}
+
+function sendShot() {
+    const message = new Paho.MQTT.Message("BANG");
+    message.destinationName = MY_ID;
+    client.send(message);
+    
+    // Visuell feedback på telefonen
+    document.body.style.background = "red";
+    
+    // Skjut inte iväg 100 meddelanden på ett enda klick, vänta lite
+    setTimeout(() => { document.body.style.background = "#222"; }, 200);
+}
+
+startBtn.addEventListener('click', init);
     </script>
 </body>
 </html>
