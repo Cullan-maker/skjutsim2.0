@@ -2,7 +2,7 @@
 <html lang="sv">
 <head>
     <meta charset="UTF-8">
-    <title>Skjutbiograf Pro - Multi-Mode</title>
+    <title>Skjutbiograf Pro - Exakt Skalning</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <style>
         body { margin: 0; background: #1a1a1a; overflow: hidden; display: flex; height: 100vh; width: 100vw; color: white; font-family: 'Segoe UI', sans-serif; }
@@ -19,56 +19,63 @@
         button { background: #2196F3; color: white; border: none; padding: 12px; font-weight: bold; border-radius: 5px; cursor: pointer; transition: 0.2s; margin-top: 5px; }
         button:hover { background: #1976D2; transform: translateY(-1px); }
         button.niva-btn { background: #ff9800; }
-        button.niva-btn:hover { background: #f57c00; }
         button.stop-btn { background: #f44336; margin-top: auto; }
 
         /* Arena */
         #main-view { flex-grow: 1; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(circle, #2c2c2c 0%, #1a1a1a 100%); }
         
-        #big-info { position: absolute; top: 8%; width: 100%; text-align: center; z-index: 50; pointer-events: none; }
+        #big-info { position: absolute; top: 5%; width: 100%; text-align: center; z-index: 50; pointer-events: none; }
         #instruction { font-size: 32px; color: #888; text-transform: uppercase; }
-        #command { font-size: 100px; font-weight: 900; text-shadow: 0 4px 10px black; }
+        #command { font-size: 100px; font-weight: 900; text-shadow: 0 4px 10px black; margin-bottom: 5px; }
+        #progress-info { font-size: 40px; color: #2196F3; font-weight: bold; }
+        
         .cmd-wait { color: #ffeb3b; }
         .cmd-fire { color: #f44336; }
 
-        #hit-feedback { position: absolute; top: 40%; font-size: 140px; font-weight: 900; opacity: 0; z-index: 60; text-transform: uppercase; transition: 0.1s; pointer-events: none; }
+        /* JÄTTESTOR FEEDBACK */
+        #hit-feedback { position: absolute; top: 40%; width: 100%; text-align: center; font-size: 160px; font-weight: 900; opacity: 0; z-index: 60; text-transform: uppercase; transition: 0.1s; pointer-events: none; }
 
-        /* Måltavlan */
+        /* Måltavlan - Storleken styrs nu dynamiskt av JS */
         #target-wrapper { position: relative; transition: transform 0.4s ease; }
-        #target-container { perspective: 1200px; width: 450px; height: 450px; }
+        #target-container { perspective: 1200px; width: 500px; height: 500px; display: flex; align-items: center; justify-content: center; }
+        
         #target {
-            width: 100%; height: 100%; border-radius: 50%; background: #000; border: 4px solid #fff;
+            width: 100%; height: 100%; border-radius: 50%; background: #000; border: 2px solid #fff;
             transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); transform: rotateY(90deg);
             box-shadow: 0 20px 50px rgba(0,0,0,0.9); position: relative;
         }
-        #inner-circle { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 50%; height: 50%; border: 2px solid rgba(255,255,255,0.4); border-radius: 50%; }
+        
+        /* Den heliga cirkeln (1% av avståndet) */
+        #inner-circle { 
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+            width: 50%; height: 50%; border: 3px solid rgba(255,255,255,0.8); border-radius: 50%; 
+            box-sizing: border-box;
+        }
+        
         .visible { transform: rotateY(0deg) !important; }
         .bullet-hole { position: absolute; width: 12px; height: 12px; background: #111; border: 2px solid #555; border-radius: 50%; transform: translate(-50%, -50%); z-index: 10; }
 
-        /* Grafik och Logg */
         #analysis-box { position: absolute; bottom: 25px; left: 25px; background: rgba(0,0,0,0.8); border: 2px solid #444; border-radius: 8px; padding: 12px; }
-        #log { position: absolute; bottom: 25px; right: 25px; background: rgba(0,0,0,0.8); padding: 15px; border-radius: 8px; width: 280px; height: 180px; overflow-y: auto; font-family: monospace; font-size: 12px; border: 1px solid #333; }
-        
-        .timer-display { font-size: 24px; color: #4CAF50; font-weight: bold; margin-top: 10px; }
+        #log { position: absolute; bottom: 25px; right: 25px; background: rgba(0,0,0,0.8); padding: 15px; border-radius: 8px; width: 280px; height: 180px; overflow-y: auto; font-family: monospace; font-size: 12px; }
     </style>
 </head>
 <body>
 
     <div id="sidebar">
-        <h2>Simulator Inställningar</h2>
+        <h2>Inställningar</h2>
         <div class="setting-group">
             <label>ID (Samma på mobilen):</label>
             <input type="text" id="myId" value="min_unika_simulator_123">
         </div>
         <div class="setting-group">
-            <label>Avstånd till skärm (m):</label>
+            <label>Fysiskt avstånd till skärm (m):</label>
             <input type="number" id="physDist" value="2.5" step="0.1">
         </div>
 
-        <h3>MODUS 1: NIVÅKONTROLL</h3>
+        <h3>NIVÅKONTROLL</h3>
         <button class="niva-btn" onclick="runNivaKontroll()">STARTA NIVÅKONTROLL</button>
         
-        <h3>MODUS 2: FRI TRÄNING (SNABBDRAG)</h3>
+        <h3>FRI TRÄNING</h3>
         <div class="setting-group">
             <label>Målavstånd (m):</label>
             <input type="number" id="virtDist" value="10">
@@ -79,22 +86,23 @@
         </div>
         <button onclick="startQuickDraw()">STARTA DRAGTRÄNING</button>
 
-        <button class="stop-btn" onclick="stopEverything()">AVBRYT ALLT</button>
-        
-        <div id="quick-stats" class="timer-display"></div>
+        <button class="stop-btn" onclick="stopEverything()">AVBRYT</button>
     </div>
 
     <div id="main-view">
         <div id="big-info">
-            <div id="instruction">Väntar...</div>
-            <div id="command" class="cmd-wait">REDO</div>
+            <div id="instruction">Redo</div>
+            <div id="command" class="cmd-wait">VÄNTA</div>
+            <div id="progress-info"></div>
         </div>
 
         <div id="hit-feedback">TRÄFF</div>
 
         <div id="target-wrapper">
             <div id="target-container">
-                <div id="target"><div id="inner-circle"></div></div>
+                <div id="target">
+                    <div id="inner-circle"></div>
+                </div>
             </div>
         </div>
 
@@ -108,17 +116,21 @@
 
     <script>
         let client, isRunning = false;
-        let shotsInCircle = 0, shotsInTarget = 0;
-        let cycleTimeout, startTime;
-        let currentMode = ""; // "NIVA" eller "DRAG"
+        let cycleTimeout, startTime, precisionTimer;
+        let currentMode = "";
+        
+        // --- MATEMATISK SKALNING ---
+        // Vi antar en standard DPI (96). 1 cm är ca 38 pixlar.
+        const PIXELS_PER_CM = 38; 
 
         const target = document.getElementById('target');
         const wrapper = document.getElementById('target-wrapper');
+        const innerCircle = document.getElementById('inner-circle');
         const cmd = document.getElementById('command');
         const inst = document.getElementById('instruction');
+        const progressInfo = document.getElementById('progress-info');
         const hitFeedback = document.getElementById('hit-feedback');
         const log = document.getElementById('log');
-        const quickStats = document.getElementById('quick-stats');
         const gCtx = document.getElementById('graphCanvas').getContext('2d');
 
         function connect() {
@@ -128,125 +140,95 @@
                 const data = JSON.parse(msg.payloadString);
                 if (data.action === "BANG") handleShot(data);
             };
-            client.connect({ useSSL: true, onSuccess: () => { 
-                client.subscribe(myId);
-                addLog("Ansluten till: " + myId);
-            }});
+            client.connect({ useSSL: true, onSuccess: () => { client.subscribe(myId); addLog("Kopplad!"); }});
         }
         connect();
 
-        function addLog(msg) {
-            log.innerHTML = `<div>> ${msg}</div>` + log.innerHTML;
+        function addLog(msg) { log.innerHTML = `<div>> ${msg}</div>` + log.innerHTML; }
+
+        function setScale(virtualDist) {
+            const physDist = parseFloat(document.getElementById('physDist').value);
+            
+            // Beräkna hur stor cirkeln SKA vara på skärmen i CM
+            // Formel: (Målets verkliga storlek / Virtuellt avstånd) * Fysiskt avstånd
+            // Eftersom målet alltid är 1% av avståndet: (0.01 * virt) / virt * phys = 0.01 * phys
+            const circleSizeOnScreenCm = physDist * 1.0; // 1 cm per meter fysiskt avstånd
+            const circleSizePixels = circleSizeOnScreenCm * PIXELS_PER_CM;
+            
+            // Vi sätter inner-circle till denna exakta pixelstorlek
+            innerCircle.style.width = circleSizePixels + "px";
+            innerCircle.style.height = circleSizePixels + "px";
+            
+            // Hela tavlan (gubben) ska skalas proportionellt mot cirkeln.
+            // Om cirkeln är 50% av tavlan (enligt CSS), så blir tavlan dubbelt så stor som cirkeln.
+            // Men polisens tavla är större. Vi sätter tavlan till att vara t.ex. 4x större än cirkeln.
+            const targetContainerSize = circleSizePixels * 4; 
+            document.getElementById('target-container').style.width = targetContainerSize + "px";
+            document.getElementById('target-container').style.height = targetContainerSize + "px";
+            
+            addLog(`Skalad för ${virtualDist}m (Cirkel på skärm: ${circleSizeOnScreenCm.toFixed(1)}cm)`);
         }
 
-        function setScale(virtualMeters) {
-            const phys = parseFloat(document.getElementById('physDist').value);
-            const scale = phys / virtualMeters;
-            wrapper.style.transform = `scale(${scale})`;
+        function handleShot(data) {
+            if (!target.classList.contains('visible')) return;
+
+            // Räkna ut träff relativt till mitten av tavlan (i pixlar)
+            const rect = target.getBoundingClientRect();
+            const centerX = rect.width / 2;
+            const centerY = rect.height / 2;
+            
+            const hitX = centerX + (data.x * 15);
+            const hitY = centerY + (data.y * 15);
+            
+            const hole = document.createElement('div');
+            hole.className = 'bullet-hole';
+            hole.style.left = hitX + 'px'; hole.style.top = hitY + 'px';
+            target.appendChild(hole);
+
+            // Kolla träff i inner-circle
+            const dist = Math.sqrt(Math.pow(data.x * 15, 2) + Math.pow(data.y * 15, 2));
+            const circleRadius = parseFloat(innerCircle.style.width) / 2;
+
+            if (dist < circleRadius) {
+                showBigFeedback("TRÄFF", "#4CAF50");
+            } else if (dist < centerX) {
+                showBigFeedback("UTANFÖR", "#ff9800");
+            } else {
+                showBigFeedback("BOM", "#f44336");
+            }
+            drawGraph(data.trace, data.x, data.y);
         }
 
         function showBigFeedback(text, color) {
             hitFeedback.innerText = text;
             hitFeedback.style.color = color;
             hitFeedback.style.opacity = "1";
-            setTimeout(() => { hitFeedback.style.opacity = "0"; }, 500);
+            setTimeout(() => { hitFeedback.style.opacity = "0"; }, 600);
         }
 
-        function handleShot(data) {
-            if (!target.classList.contains('visible')) return;
-
-            const drawTime = (Date.now() - startTime) / 1000;
-            const hitX = 225 + (data.x * 15);
-            const hitY = 225 + (data.y * 15);
-            const dist = Math.sqrt(Math.pow(hitX - 225, 2) + Math.pow(hitY - 225, 2));
-
-            const hole = document.createElement('div');
-            hole.className = 'bullet-hole';
-            hole.style.left = hitX + 'px'; hole.style.top = hitY + 'px';
-            document.getElementById('target').appendChild(hole);
-
-            if (currentMode === "DRAG") {
-                quickStats.innerText = `TID: ${drawTime.toFixed(2)}s`;
-                addLog(`Skottid: ${drawTime.toFixed(2)}s`);
-            }
-
-            if (dist < 112) {
-                shotsInCircle++;
-                showBigFeedback("TRÄFF", "#4CAF50");
-            } else if (dist < 225) {
-                shotsInTarget++;
-                showBigFeedback("UTANFÖR", "#ff9800");
-            } else {
-                showBigFeedback("BOM", "#f44336");
-            }
-
-            drawGraph(data.trace, data.x, data.y);
-        }
-
-        function drawGraph(trace, fx, fy) {
-            gCtx.clearRect(0,0,200,200);
-            gCtx.strokeStyle = "#333"; gCtx.beginPath(); gCtx.moveTo(100,0); gCtx.lineTo(100,200); gCtx.moveTo(0,100); gCtx.lineTo(200,100); gCtx.stroke();
-            if(!trace) return;
-            gCtx.strokeStyle = "#2196F3"; gCtx.beginPath();
-            trace.forEach((p, i) => {
-                let x = 100 + (p.x * 5); let y = 100 + (p.y * 5);
-                if(i===0) gCtx.moveTo(x,y); else gCtx.lineTo(x,y);
-            });
-            gCtx.stroke();
-            gCtx.fillStyle = "red"; gCtx.beginPath(); gCtx.arc(100+(fx*5), 100+(fy*5), 4, 0, 7); gCtx.fill();
-        }
-
-        // --- ÖVNINGSLOGIK ---
+        // --- MOMENT-LOGIK (Samma som innan men med nya setScale) ---
         const wait = (ms) => new Promise(r => cycleTimeout = setTimeout(r, ms));
 
-        async function startQuickDraw() {
-            stopEverything();
-            isRunning = true; currentMode = "DRAG";
-            const dist = document.getElementById('virtDist').value;
-            const time = document.getElementById('showTime').value * 1000;
-            setScale(dist);
-            
-            while(isRunning) {
-                inst.innerText = `Snabbdrag (${dist}m)`;
-                cmd.innerText = "STANDBY"; cmd.className = "cmd-wait";
-                await wait(Math.random() * 3000 + 2000);
-                
-                if(!isRunning) break;
-                startTime = Date.now();
-                target.classList.add('visible');
-                cmd.innerText = "ELD!"; cmd.className = "cmd-fire";
-                await wait(time);
-                target.classList.remove('visible');
-                await wait(2000);
-            }
-        }
-
         async function runNivaKontroll() {
-            stopEverything();
-            isRunning = true; currentMode = "NIVA";
-            addLog("--- STARTAR NIVÅKONTROLL ---");
-
-            for (let omgång = 1; omgång <= 3; omgång++) {
+            stopEverything(); isRunning = true;
+            for (let o = 1; o <= 3; o++) {
                 if(!isRunning) break;
-                addLog(`Omgång ${omgång}/3`);
-                
-                // 1. Låg färdigställning
-                await runSubMoment("Låg färdigställning", 10, 3000, 5, "Låg färdigställning");
-                // 2. Drag från hölster
-                await runSubMoment("Drag från hölster", 10, 4000, 5, "Vapnet i hölstret");
-                // 3. Precision
+                await runSubMoment(`Låg färdigställning`, 10, 3000, 5);
+                await runSubMoment(`Drag från hölster`, 10, 4000, 5);
                 await runPrecision(15, 60000, 3);
             }
-            if(isRunning) { inst.innerText = "Nivåkontroll Klar"; cmd.innerText = "GODKÄND?"; isRunning = false; }
+            if(isRunning) { inst.innerText = "KLAR!"; cmd.innerText = "SNIFF SNIFF!"; isRunning = false; }
         }
 
-        async function runSubMoment(name, dist, time, reps, hint) {
+        async function runSubMoment(name, dist, time, reps) {
             setScale(dist);
             inst.innerText = name;
             for(let i=0; i<reps; i++) {
                 if(!isRunning) return;
-                cmd.innerText = hint; cmd.className = "cmd-wait";
+                progressInfo.innerText = `Visning ${i+1} av ${reps}`;
+                cmd.innerText = "VÄNTA"; cmd.className = "cmd-wait";
                 await wait(4000);
+                if(!isRunning) return;
                 startTime = Date.now();
                 target.classList.add('visible');
                 cmd.innerText = "ELD!"; cmd.className = "cmd-fire";
@@ -261,19 +243,52 @@
             inst.innerText = "Precision";
             cmd.innerText = `Skjut ${shots} skott`; cmd.className = "cmd-wait";
             await wait(4000);
-            startTime = Date.now();
             target.classList.add('visible');
             cmd.innerText = "ELD!"; cmd.className = "cmd-fire";
+            let sec = time / 1000;
+            precisionTimer = setInterval(() => {
+                sec--;
+                progressInfo.innerText = `${sec}s kvar`;
+                if(sec <= 0) clearInterval(precisionTimer);
+            }, 1000);
             await wait(time);
             target.classList.remove('visible');
+            clearInterval(precisionTimer);
+        }
+
+        async function startQuickDraw() {
+            stopEverything(); isRunning = true;
+            const d = document.getElementById('virtDist').value;
+            const t = document.getElementById('showTime').value * 1000;
+            setScale(d);
+            while(isRunning) {
+                inst.innerText = "Fri träning";
+                cmd.innerText = "VÄNTA"; await wait(Math.random()*3000+2000);
+                if(!isRunning) break;
+                target.classList.add('visible');
+                cmd.innerText = "ELD!"; await wait(t);
+                target.classList.remove('visible');
+                await wait(2000);
+            }
         }
 
         function stopEverything() {
-            clearTimeout(cycleTimeout);
-            isRunning = false;
-            target.classList.remove('visible');
-            cmd.innerText = "STOPP"; inst.innerText = "Avbruten";
-            quickStats.innerText = "";
+            clearTimeout(cycleTimeout); clearInterval(precisionTimer);
+            isRunning = false; target.classList.remove('visible');
+            cmd.innerText = "STOPP"; progressInfo.innerText = "";
+        }
+
+        function drawGraph(trace, fx, fy) {
+            gCtx.clearRect(0,0,200,200);
+            gCtx.strokeStyle = "#333"; gCtx.beginPath(); gCtx.moveTo(100,0); gCtx.lineTo(100,200); gCtx.moveTo(0,100); gCtx.lineTo(200,100); gCtx.stroke();
+            if(!trace) return;
+            gCtx.strokeStyle = "#2196F3"; gCtx.beginPath();
+            trace.forEach((p, i) => {
+                let x = 100 + (p.x * 5); let y = 100 + (p.y * 5);
+                if(i===0) gCtx.moveTo(x,y); else gCtx.lineTo(x,y);
+            });
+            gCtx.stroke();
+            gCtx.fillStyle = "red"; gCtx.beginPath(); gCtx.arc(100+(fx*5), 100+(fy*5), 4, 0, 7); gCtx.fill();
         }
     </script>
 </body>
