@@ -3,99 +3,180 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Vapen-Sensor</title>
+    <title>Vapen-Sensor (Smart)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <style>
-        body { background: #222; color: white; font-family: sans-serif; text-align: center; padding: 20px; }
-        button { background: #4CAF50; color: white; border: none; padding: 20px; font-size: 20px; border-radius: 10px; width: 100%; margin-bottom: 20px; }
-        #mic-indicator { width: 100%; height: 20px; background: #444; margin: 10px 0; border-radius: 10px; overflow: hidden; }
-        #mic-level { height: 100%; width: 0%; background: lime; transition: width 0.1s; }
+        body { 
+            background: #1e1e1e; color: white; font-family: sans-serif; 
+            text-align: center; padding: 20px; margin: 0;
+        }
+        h2 { margin-bottom: 5px; }
+        .warning { color: #ff9800; font-size: 14px; margin-bottom: 20px; }
+        
+        button { 
+            background: #4CAF50; color: white; border: none; 
+            padding: 20px; font-size: 20px; font-weight: bold;
+            border-radius: 10px; width: 100%; margin-bottom: 15px; 
+            cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        button:active { background: #45a049; transform: translateY(2px); }
+        
+        #testBtn { background: #2196F3; display: none; }
+        #testBtn:active { background: #1976D2; }
+        
+        #status-box {
+            background: #333; padding: 15px; border-radius: 8px; 
+            margin-bottom: 20px; font-size: 16px; min-height: 40px;
+        }
+
+        #mic-container { background: #222; padding: 15px; border-radius: 8px; }
+        #mic-indicator { 
+            width: 100%; height: 30px; background: #444; 
+            margin: 10px 0; border-radius: 5px; overflow: hidden; 
+            position: relative;
+        }
+        #mic-level { height: 100%; width: 0%; background: #00FF00; transition: width 0.05s; }
+        #threshold-line {
+            position: absolute; top: 0; bottom: 0; width: 2px; 
+            background: red; z-index: 10;
+        }
+        
+        input[type=range] { width: 100%; margin-top: 10px; }
     </style>
 </head>
 <body>
+
     <h2>Vapen-Sensor</h2>
-    <button id="startBtn">1. Aktivera Sensorer</button>
-    <div id="status">Status: Ej redo</div>
-    <div id="mic-indicator"><div id="mic-level"></div></div>
-    <p>Känslighet: <input type="range" id="threshold" min="0" max="255" value="150"></p>
+    <div class="warning">OBS: Fungerar endast via en https-länk (t.ex. GitHub Pages)</div>
 
- const MY_ID = "min_unika_simulator_123"; // MÅSTE VARA SAMMA SOM PÅ DATORN
-let client, audioContext, analyser, dataArray;
-const startBtn = document.getElementById('startBtn');
-const micLevel = document.getElementById('mic-level');
-const thresholdInput = document.getElementById('threshold');
-const statusText = document.getElementById('status');
+    <button id="startBtn">1. Aktivera Systemet</button>
+    <button id="testBtn">Skjut Manuellt (Test)</button>
 
-async function init() {
-    try {
-        statusText.innerText = "Startar sensorer...";
+    <div id="status-box">Status: Ej startad. Klicka på knappen ovan.</div>
 
-        // 1. Fråga om mikrofonen (Här stannar det ofta om det inte är HTTPS)
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        
-        // Kompatibilitet för både Apple och Android
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        audioContext = new AudioContext();
-        const source = audioContext.createMediaStreamSource(stream);
-        analyser = audioContext.createAnalyser();
-        source.connect(analyser);
-        dataArray = new Uint8Array(analyser.frequencyBinCount);
+    <div id="mic-container">
+        <p style="margin:0 0 10px 0;"><strong>Mikrofonnivå</strong></p>
+        <div id="mic-indicator">
+            <div id="mic-level"></div>
+            <div id="threshold-line" style="left: 60%;"></div>
+        </div>
+        <p style="font-size: 14px; color: #aaa;">Känslighet (Röd linje): <span id="thresh-val">150</span></p>
+        <input type="range" id="threshold" min="0" max="255" value="150">
+    </div>
 
-        // 2. Fråga om gyroskop (Krävs för iOS 13+)
-        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-            const permission = await DeviceOrientationEvent.requestPermission();
-            if (permission !== 'granted') {
-                alert("Du avböjde rörelsesensorerna. Ladda om sidan och tillåt.");
-                return;
+    <script>
+        // --- VIKTIGT: ÄNDRA TILL SAMMA ID SOM PÅ DATORN ---
+        const MY_ID = "min_unika_simulator_123"; 
+        // --------------------------------------------------
+
+        let client, audioContext, analyser, dataArray;
+        let isReadyToShoot = true; // Förhindrar maskingevärs-effekt
+
+        const startBtn = document.getElementById('startBtn');
+        const testBtn = document.getElementById('testBtn');
+        const statusBox = document.getElementById('status-box');
+        const micLevel = document.getElementById('mic-level');
+        const thresholdInput = document.getElementById('threshold');
+        const thresholdLine = document.getElementById('threshold-line');
+        const threshVal = document.getElementById('thresh-val');
+
+        // Uppdatera den röda linjen när man drar i reglaget
+        thresholdInput.addEventListener('input', (e) => {
+            const val = e.target.value;
+            threshVal.innerText = val;
+            thresholdLine.style.left = (val / 2.55) + "%";
+        });
+
+        async function initSystem() {
+            try {
+                startBtn.innerText = "Laddar...";
+                statusBox.innerHTML = "Frågar om mikrofon-behörighet...<br><em>(Klicka 'Tillåt' om du får en fråga)</em>";
+
+                // 1. Starta Mikrofonen
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioContext = new AudioContext();
+                const source = audioContext.createMediaStreamSource(stream);
+                analyser = audioContext.createAnalyser();
+                source.connect(analyser);
+                dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+                statusBox.innerHTML = "Mikrofon OK. Ansluter till nätverket...";
+
+                // 2. Koppla upp mot molnet (MQTT)
+                const randomClientId = "phone_" + Math.random().toString(16).substring(2, 10);
+                client = new Paho.MQTT.Client("broker.hivemq.com", Number(8000), randomClientId);
+                
+                client.connect({ 
+                    onSuccess: () => { 
+                        statusBox.innerHTML = "<span style='color: #4CAF50; font-weight: bold;'>Kopplad och Klar!</span><br>Rikta mot skärmen och tryck av.";
+                        startBtn.style.display = "none"; // Göm startknappen
+                        testBtn.style.display = "block"; // Visa manuella skjutknappen
+                        detectSound(); // Starta lyssnandet!
+                    },
+                    onFailure: (err) => {
+                        statusBox.innerHTML = "<span style='color: red;'>Nätverksfel: Kunde inte ansluta till servern.</span>";
+                        console.error(err);
+                        startBtn.innerText = "Försök Igen";
+                    }
+                });
+
+            } catch (error) {
+                console.error(error);
+                let errorMessage = "Ett okänt fel uppstod.";
+                
+                if (error.name === "NotAllowedError" || error.message.includes("Permission denied")) {
+                    errorMessage = "Du nekade åtkomst till mikrofonen, eller så har telefonen blockerat det. Ladda om sidan och tillåt åtkomst.";
+                } else if (location.protocol !== 'https:') {
+                    errorMessage = "Mikrofonen blockeras eftersom du inte använder en säker anslutning (HTTPS). Ladda upp filen till GitHub Pages först!";
+                }
+
+                statusBox.innerHTML = `<span style='color: #f44336;'><b>Fel:</b> ${errorMessage}</span>`;
+                startBtn.innerText = "1. Aktivera Systemet";
             }
         }
 
-        // 3. Koppla till datorn via MQTT
-        statusText.innerText = "Kopplar till nätverket...";
-        client = new Paho.MQTT.Client("broker.hivemq.com", Number(8000), "phone_" + Math.random().toString(16).substr(2, 8));
-        
-        client.connect({ 
-            onSuccess: () => { 
-                statusText.innerText = "Kopplad! Redo att skjuta."; 
-                detectSound(); // Börja lyssna efter skott först nu!
-            },
-            onFailure: (err) => {
-                alert("Nätverksfel: Kunde inte koppla till datorn. Kolla internet.");
-                statusText.innerText = "Nätverksfel";
+        // Lyssnar-loopen (Körs 60 gånger i sekunden)
+        function detectSound() {
+            analyser.getByteFrequencyData(dataArray);
+            let maxVol = Math.max(...dataArray); // Hittar den högsta volymen just nu
+            
+            // Animera den gröna mätaren
+            micLevel.style.width = (maxVol / 2.55) + "%";
+
+            // Om ljudet går över gränsen OCH vi är redo att skjuta
+            if (maxVol > thresholdInput.value && isReadyToShoot) {
+                fireShot();
             }
-        });
+            
+            requestAnimationFrame(detectSound);
+        }
 
-    } catch (error) {
-        // HÄR FÅNGAR VI FELET!
-        alert("Något gick fel!\n\nOrsak: " + error.message + "\n\nÄr du säker på att du surfar via en https-länk?");
-        statusText.innerText = "Fel: " + error.message;
-    }
-}
+        // Skicka signalen till datorn
+        function fireShot() {
+            isReadyToShoot = false; // Lås avtryckaren tillfälligt
+            
+            // Skapa meddelandet "BANG" och skicka till rätt ID
+            const message = new Paho.MQTT.Message("BANG");
+            message.destinationName = MY_ID;
+            client.send(message);
+            
+            // Visuell blixt på telefonen
+            document.body.style.background = "#f44336"; // Röd
+            statusBox.innerHTML = "<b>PANG!</b> Skott skickat.";
+            
+            // Återställ skärmen och avtryckaren efter en halv sekund
+            setTimeout(() => { 
+                document.body.style.background = "#1e1e1e"; 
+                statusBox.innerHTML = "<span style='color: #4CAF50;'>Redo för nästa skott.</span>";
+                isReadyToShoot = true; 
+            }, 500);
+        }
 
-function detectSound() {
-    analyser.getByteFrequencyData(dataArray);
-    let maxVol = Math.max(...dataArray);
-    micLevel.style.width = (maxVol / 2.55) + "%";
-
-    if (maxVol > thresholdInput.value) {
-        sendShot();
-    }
-    requestAnimationFrame(detectSound);
-}
-
-function sendShot() {
-    const message = new Paho.MQTT.Message("BANG");
-    message.destinationName = MY_ID;
-    client.send(message);
-    
-    // Visuell feedback på telefonen
-    document.body.style.background = "red";
-    
-    // Skjut inte iväg 100 meddelanden på ett enda klick, vänta lite
-    setTimeout(() => { document.body.style.background = "#222"; }, 200);
-}
-
-startBtn.addEventListener('click', init);
+        // Koppla knapparna
+        startBtn.addEventListener('click', initSystem);
+        testBtn.addEventListener('click', fireShot);
     </script>
 </body>
 </html>
