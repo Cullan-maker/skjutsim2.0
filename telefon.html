@@ -9,12 +9,9 @@
         @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&display=swap');
 
         body { margin: 0; background: #000; color: white; font-family: 'Rajdhani', sans-serif; overflow: hidden; height: 100vh; width: 100vw; }
-        
         #camera-stream { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; background: #050505; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; transition: background 0.1s; }
         
-        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; transition: background 0.05s; }
-        
-        /* Modern Neumorphic / Frosted UI */
         .panel { 
             background: rgba(15, 15, 18, 0.7); backdrop-filter: blur(10px);
             padding: 15px 25px; pointer-events: auto; display: flex; flex-direction: row; justify-content: space-between; align-items: center;
@@ -27,35 +24,22 @@
             cursor: pointer; box-shadow: 0 4px 15px rgba(0, 150, 255, 0.4); transition: transform 0.1s; 
         }
         button:active { transform: scale(0.95); }
-        
         #calBtn { display: none; background: linear-gradient(145deg, #00e676, #00c853); box-shadow: 0 4px 15px rgba(0, 230, 118, 0.4); }
         
-        /* --- PBR METALLISKT SIKTE --- */
         #sight-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5; pointer-events: none; width: 220px; height: 100px; }
-        
-        /* Bakre skåran med djup/bevel */
         .rear-sight { 
             position: absolute; bottom: 0; left: 0; width: 220px; height: 60px; 
             background: linear-gradient(180deg, #444 0%, #1a1a1a 10%, #0a0a0a 100%); 
-            border-top: 1px solid #777; 
-            clip-path: polygon(0 0, 85px 0, 85px 100%, 135px 100%, 135px 0, 220px 0, 220px 100%, 0 100%); 
-            filter: drop-shadow(0 10px 10px rgba(0,0,0,1));
+            border-top: 1px solid #777; clip-path: polygon(0 0, 85px 0, 85px 100%, 135px 100%, 135px 0, 220px 0, 220px 100%, 0 100%); filter: drop-shadow(0 10px 10px rgba(0,0,0,1));
         }
-        
-        /* Främre kornet med reflektion */
         .front-sight { 
             position: absolute; bottom: 10px; left: 98px; width: 24px; height: 50px; 
             background: linear-gradient(90deg, #111 0%, #333 20%, #444 50%, #222 80%, #0a0a0a 100%); 
-            border-top: 2px solid #888; border-radius: 2px 2px 0 0;
-            transition: transform 0.05s linear; 
-            box-shadow: 0 5px 15px rgba(0,0,0,0.9);
+            border-top: 2px solid #888; border-radius: 2px 2px 0 0; transition: transform 0.05s linear; box-shadow: 0 5px 15px rgba(0,0,0,0.9);
         }
-        
-        /* Lyspunkt (Tritium) */
         .front-dot { 
             position: absolute; top: 8px; left: 6px; width: 12px; height: 12px; 
-            background: radial-gradient(circle, #fff 0%, #888 100%); border-radius: 50%; 
-            transition: background 0.2s, box-shadow 0.2s; box-shadow: inset 0 2px 4px rgba(0,0,0,0.8);
+            background: radial-gradient(circle, #fff 0%, #888 100%); border-radius: 50%; transition: background 0.2s, box-shadow 0.2s; box-shadow: inset 0 2px 4px rgba(0,0,0,0.8);
         }
         .dot-aligned { background: radial-gradient(circle, #fff 0%, #00e676 100%) !important; box-shadow: 0 0 15px #00e676 !important; }
 
@@ -63,9 +47,14 @@
         #main-title { font-size: 20px; margin: 0; color: #fff; letter-spacing: 2px; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
         #sub-status { font-size: 14px; color: #00e5ff; font-weight: 700; }
         
-        /* Slider PBR */
-        input[type=range] { -webkit-appearance: none; width: 60%; background: transparent; pointer-events: auto; opacity: 0.7; position: absolute; bottom: 30px; left: 20%; }
-        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 24px; width: 12px; background: #fff; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.8); cursor: pointer; }
+        .slider-container {
+            position: absolute; bottom: 15px; left: 10%; width: 80%; display: flex; flex-direction: column; gap: 10px; pointer-events: auto; opacity: 0.8;
+        }
+        .slider-row { display: flex; flex-direction: column; text-align: left; }
+        .slider-row label { font-size: 11px; color: #00e5ff; font-weight: bold; margin-bottom: 2px; letter-spacing: 1px; }
+
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 20px; width: 12px; background: #fff; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.8); cursor: pointer; }
         input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 2px; }
     </style>
 </head>
@@ -87,7 +76,17 @@
             <button id="startBtn">AKTIVERA</button>
             <button id="calBtn">KALIBRERA SIKTE</button>
         </div>
-        <input type="range" id="threshold" min="0" max="255" value="150">
+        
+        <div class="slider-container">
+            <div class="slider-row">
+                <label>AVTRYCKAR-KÄNSLIGHET (LJUD)</label>
+                <input type="range" id="threshold" min="0" max="255" value="150">
+            </div>
+            <div class="slider-row">
+                <label>OMLADDNINGS-FILTER (SPÄRRTID EFTER SKOTT)</label>
+                <input type="range" id="cooldown" min="100" max="2000" value="800">
+            </div>
+        </div>
     </div>
 
     <script>
@@ -107,6 +106,8 @@
         const video = document.getElementById('camera-stream');
         const frontSight = document.getElementById('front-sight');
         const frontDot = document.getElementById('front-dot');
+        const uiLayer = document.getElementById('ui-layer');
+        const cooldownSlider = document.getElementById('cooldown');
 
         async function initSystem() {
             startBtn.innerText = "...";
@@ -128,8 +129,7 @@
                 dataArray = new Uint8Array(analyser.frequencyBinCount);
 
                 if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                    const perm = await DeviceOrientationEvent.requestPermission();
-                    if (perm !== 'granted') throw new Error("Gyroskop nekat");
+                    await DeviceOrientationEvent.requestPermission();
                 }
 
                 subStatusEl.innerText = "Kopplar nätverk...";
@@ -182,18 +182,36 @@
 
         function detectSound() {
             analyser.getByteFrequencyData(dataArray);
-            if (Math.max(...dataArray) > document.getElementById('threshold').value && isReadyToShoot) fireShot();
+            if (Math.max(...dataArray) > document.getElementById('threshold').value && isReadyToShoot) {
+                fireShot();
+            }
             requestAnimationFrame(detectSound);
         }
 
         function fireShot() {
             isReadyToShoot = false;
+            const cooldownTime = parseInt(cooldownSlider.value); // Hämta tid från reglaget
+
             const payload = JSON.stringify({ action: "BANG", x: currentX, y: currentY, trace: traceHistory });
             const message = new Paho.MQTT.Message(payload);
             message.destinationName = MY_ID; client.send(message);
             
-            document.getElementById('ui-layer').style.background = "rgba(255,255,255,0.4)";
-            setTimeout(() => { document.getElementById('ui-layer').style.background = "transparent"; isReadyToShoot = true; }, 80);
+            // Visuell Blixt
+            uiLayer.style.background = "rgba(255,255,255,0.6)";
+            subStatusEl.innerText = "SPÄRR AKTIV (LADDAR OM)";
+            subStatusEl.style.color = "#ff9800";
+
+            setTimeout(() => { 
+                uiLayer.style.background = "rgba(255, 152, 0, 0.1)"; // Lätt orange ton under spärrtiden
+            }, 80);
+
+            // Spärr (Cooldown) - Ignorerar ljud tills tiden har gått ut
+            setTimeout(() => {
+                uiLayer.style.background = "transparent";
+                subStatusEl.innerText = "Sensor Låst & Redo";
+                subStatusEl.style.color = "#fff";
+                isReadyToShoot = true; // Nu kan du skjuta igen!
+            }, cooldownTime);
         }
 
         startBtn.addEventListener('click', initSystem);
