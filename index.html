@@ -2,97 +2,176 @@
 <html lang="sv">
 <head>
     <meta charset="UTF-8">
-    <title>Skjutbiograf Pro - Polissimulator</title>
+    <title>Skjutbiograf Pro - Tactical Edition</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <style>
-        body { margin: 0; background: #1a1a1a; overflow: hidden; display: flex; height: 100vh; width: 100vw; color: white; font-family: 'Segoe UI', sans-serif; }
-        
-        /* Kontrollpanel */
-        #sidebar { width: 340px; background: #111; padding: 25px; box-sizing: border-box; display: flex; flex-direction: column; gap: 15px; border-right: 3px solid #333; z-index: 100; overflow-y: auto; }
-        h2 { margin: 0; color: #4CAF50; font-size: 20px; text-transform: uppercase; }
-        h3 { margin: 10px 0 5px 0; font-size: 14px; color: #888; border-bottom: 1px solid #333; padding-bottom: 5px; }
-        
-        .setting-group { display: flex; flex-direction: column; gap: 4px; }
-        label { font-size: 12px; color: #aaa; }
-        input { width: 100%; padding: 8px; background: #222; border: 1px solid #444; color: white; border-radius: 4px; font-size: 14px; }
-        
-        button { background: #2196F3; color: white; border: none; padding: 12px; font-weight: bold; border-radius: 5px; cursor: pointer; transition: 0.2s; margin-top: 5px; }
-        button:hover { background: #1976D2; transform: translateY(-1px); }
-        button.niva-btn { background: #ff9800; }
-        button.stop-btn { background: #f44336; margin-top: auto; }
+        @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Roboto:wght@400;700&display=swap');
 
-        /* Arena */
-        #main-view { flex-grow: 1; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(circle, #2c2c2c 0%, #1a1a1a 100%); }
-        
-        #big-info { position: absolute; top: 5%; width: 100%; text-align: center; z-index: 50; pointer-events: none; }
-        #instruction { font-size: 32px; color: #888; text-transform: uppercase; }
-        #command { font-size: 100px; font-weight: 900; text-shadow: 0 4px 10px black; margin-bottom: 5px; }
-        #progress-info { font-size: 40px; color: #2196F3; font-weight: bold; }
-        
-        .cmd-wait { color: #ffeb3b; }
-        .cmd-fire { color: #f44336; }
+        :root {
+            --bg-color: #08080a;
+            --panel-bg: rgba(20, 20, 25, 0.7);
+            --neon-blue: #00e5ff;
+            --neon-green: #00e676;
+            --neon-red: #ff1744;
+            --neon-orange: #ff9100;
+            --text-main: #e0e0e0;
+        }
 
-        /* Visuell Feedback för Träff */
-        #hit-feedback { position: absolute; top: 40%; width: 100%; text-align: center; font-size: 160px; font-weight: 900; opacity: 0; z-index: 60; text-transform: uppercase; transition: 0.1s; pointer-events: none; }
+        body { 
+            margin: 0; background: radial-gradient(circle at center, #1a1a24 0%, var(--bg-color) 100%);
+            overflow: hidden; display: flex; height: 100vh; width: 100vw; 
+            color: var(--text-main); font-family: 'Roboto', sans-serif; 
+        }
+        
+        /* Modern Sidebar (Glassmorphism) */
+        #sidebar { 
+            width: 360px; background: var(--panel-bg); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
+            padding: 30px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px; 
+            border-right: 1px solid rgba(255,255,255,0.05); z-index: 100; overflow-y: auto;
+            box-shadow: 5px 0 30px rgba(0,0,0,0.5);
+        }
+        
+        h2 { margin: 0; color: white; font-family: 'Rajdhani', sans-serif; font-size: 28px; font-weight: 700; letter-spacing: 1px; text-shadow: 0 0 10px rgba(255,255,255,0.2); }
+        h3 { margin: 10px 0 5px 0; font-size: 13px; color: var(--neon-blue); text-transform: uppercase; letter-spacing: 2px; border-bottom: 1px solid rgba(0, 229, 255, 0.3); padding-bottom: 8px; }
+        
+        .setting-group { display: flex; flex-direction: column; gap: 6px; }
+        label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
+        input { width: 100%; padding: 12px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 6px; font-size: 15px; font-family: 'Roboto'; transition: border 0.3s; box-sizing: border-box;}
+        input:focus { outline: none; border-color: var(--neon-blue); box-shadow: 0 0 10px rgba(0, 229, 255, 0.2); }
+        
+        button { 
+            background: linear-gradient(135deg, #1e88e5 0%, #1565c0 100%); color: white; 
+            border: 1px solid rgba(255,255,255,0.1); padding: 14px; font-weight: bold; font-family: 'Rajdhani', sans-serif; font-size: 18px; letter-spacing: 1px;
+            border-radius: 6px; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); margin-top: 5px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(30, 136, 229, 0.4); filter: brightness(1.1); }
+        button:active { transform: translateY(1px); }
+        
+        button.niva-btn { background: linear-gradient(135deg, #f57c00 0%, #e65100 100%); }
+        button.niva-btn:hover { box-shadow: 0 6px 20px rgba(245, 124, 0, 0.4); }
+        button.stop-btn { background: transparent; border: 1px solid var(--neon-red); color: var(--neon-red); margin-top: auto; }
+        button.stop-btn:hover { background: rgba(255, 23, 68, 0.1); box-shadow: 0 0 15px rgba(255, 23, 68, 0.3); }
 
-        /* Måltavlan - Dynamisk storlek */
+        /* Huvudvyn */
+        #main-view { flex-grow: 1; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        
+        /* Heads Up Display (HUD) */
+        #big-info { position: absolute; top: 8%; width: 100%; text-align: center; z-index: 50; pointer-events: none; }
+        #instruction { font-family: 'Rajdhani', sans-serif; font-size: 38px; color: rgba(255,255,255,0.6); text-transform: uppercase; font-weight: 600; letter-spacing: 2px; }
+        #command { font-family: 'Rajdhani', sans-serif; font-size: 120px; font-weight: 700; text-shadow: 0 5px 20px rgba(0,0,0,0.8); margin: -10px 0; transition: color 0.3s; }
+        #progress-info { font-family: 'Roboto', sans-serif; font-size: 32px; color: var(--neon-blue); font-weight: 400; margin-top: 10px; }
+        
+        .cmd-wait { color: var(--neon-orange); }
+        .cmd-fire { color: var(--neon-red); text-shadow: 0 0 30px rgba(255, 23, 68, 0.6), 0 5px 20px rgba(0,0,0,0.8) !important; }
+
+        /* Kinetisk Feedback */
+        #hit-feedback { 
+            position: absolute; top: 35%; width: 100%; text-align: center; 
+            font-family: 'Rajdhani', sans-serif; font-size: 180px; font-weight: 700; 
+            opacity: 0; z-index: 60; text-transform: uppercase; pointer-events: none;
+            transform: scale(0.8); transition: opacity 0.1s, transform 0.1s;
+        }
+        .feedback-pop { opacity: 1 !important; transform: scale(1) !important; text-shadow: 0 0 50px currentColor; }
+
+        /* Måltavlan (Premium Mekanik) */
         #target-wrapper { position: relative; transition: transform 0.4s ease; }
         #target-container { perspective: 1200px; display: flex; align-items: center; justify-content: center; }
         
         #target {
-            width: 100%; height: 100%; border-radius: 50%; background: #111; border: 2px solid #ddd;
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); transform: rotateY(90deg);
-            box-shadow: 0 20px 50px rgba(0,0,0,0.9); position: relative; overflow: hidden;
+            width: 100%; height: 100%; border-radius: 50%; background: #111; 
+            border: 3px solid #ccc;
+            /* Fjädrande animation för realistisk målvändning */
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+            transform: rotateY(90deg);
+            box-shadow: 0 30px 60px rgba(0,0,0,0.8), inset 0 0 50px rgba(0,0,0,0.8); 
+            position: relative; overflow: hidden;
         }
         
-        /* Den inre ringen (Målet) */
         #inner-circle { 
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-            border: 2px solid rgba(255,255,255,0.5); border-radius: 50%; 
-            box-sizing: border-box;
+            border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; 
+            box-sizing: border-box; box-shadow: 0 0 20px rgba(255,255,255,0.05);
         }
         
         .visible { transform: rotateY(0deg) !important; }
         
-        /* Realistiskt skotthål */
+        /* Realistiska Skotthål (Djup och skugga) */
         .bullet-hole { 
-            position: absolute; 
-            width: 14px; 
-            height: 14px; 
-            background: #2a2a2a; /* Mörkgrått pappershål */
-            border: 1px solid #000; 
+            position: absolute; width: 14px; height: 14px; 
+            /* Inner mörker och yttre bränd/riven papperskant */
+            background: radial-gradient(circle at 30% 30%, #222 0%, #000 70%); 
+            border: 1px solid rgba(255,255,255,0.15); 
             border-radius: 50%; 
-            transform: translate(-50%, -50%); 
-            z-index: 10;
-            box-shadow: inset 0 2px 5px rgba(0,0,0,0.9), 0 0 2px rgba(255,255,255,0.2);
+            transform: translate(-50%, -50%); z-index: 10;
+            box-shadow: inset 0 3px 6px rgba(0,0,0,1), 0 1px 2px rgba(255,255,255,0.2);
         }
 
-        #analysis-box { position: absolute; bottom: 25px; left: 25px; background: rgba(0,0,0,0.8); border: 2px solid #444; border-radius: 8px; padding: 12px; }
-        #log { position: absolute; bottom: 25px; right: 25px; background: rgba(0,0,0,0.8); padding: 15px; border-radius: 8px; width: 280px; height: 180px; overflow-y: auto; font-family: monospace; font-size: 12px; color: #ccc; }
+        /* Taktisk Graf-panel */
+        #analysis-box { 
+            position: absolute; bottom: 30px; left: 30px; 
+            background: var(--panel-bg); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 15px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        canvas { background: rgba(0,0,0,0.4); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); }
+        .box-title { font-family: 'Rajdhani', sans-serif; font-size: 14px; letter-spacing: 2px; color: var(--neon-blue); text-align: center; margin-top: 10px; font-weight: 600; }
+
+        /* Terminal Logg */
+        #log { 
+            position: absolute; bottom: 30px; right: 30px; 
+            background: var(--panel-bg); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            padding: 20px; border-radius: 12px; width: 300px; height: 160px; overflow-y: auto; 
+            font-family: 'Courier New', Courier, monospace; font-size: 12px; color: #aaa; 
+            border: 1px solid rgba(255,255,255,0.05); box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        #log div { margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 2px; }
+        .log-time { color: var(--neon-blue); margin-right: 5px; }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
     </style>
 </head>
 <body>
 
     <div id="sidebar">
-        <h2>Inställningar</h2>
-        <div class="setting-group"><label>ID (Samma på mobilen):</label><input type="text" id="myId" value="min_unika_simulator_123"></div>
-        <div class="setting-group"><label>Ditt fysiska avstånd till skärm (m):</label><input type="number" id="physDist" value="2.5" step="0.1"></div>
+        <h2>SKJUTBIOGRAF PRO</h2>
+        
+        <h3>Systemlänk</h3>
+        <div class="setting-group">
+            <label>Nätverks-ID</label>
+            <input type="text" id="myId" value="min_unika_simulator_123">
+        </div>
+        <div class="setting-group" style="margin-top: 10px;">
+            <label>Avstånd till skärm (Meter)</label>
+            <input type="number" id="physDist" value="2.5" step="0.1">
+        </div>
 
-        <h3>NIVÅKONTROLL</h3>
+        <h3 style="margin-top: 20px;">Polisens Prov</h3>
         <button class="niva-btn" onclick="runNivaKontroll()">STARTA NIVÅKONTROLL</button>
         
-        <h3>FRI TRÄNING</h3>
-        <div class="setting-group"><label>Målavstånd (m):</label><input type="number" id="virtDist" value="10"></div>
-        <div class="setting-group"><label>Tavelvisning (sek):</label><input type="number" id="showTime" value="3.0" step="0.1"></div>
+        <h3 style="margin-top: 20px;">Fri Träning</h3>
+        <div style="display: flex; gap: 10px;">
+            <div class="setting-group" style="flex: 1;">
+                <label>Målavstånd (m)</label>
+                <input type="number" id="virtDist" value="10">
+            </div>
+            <div class="setting-group" style="flex: 1;">
+                <label>Tid (sek)</label>
+                <input type="number" id="showTime" value="3.0" step="0.1">
+            </div>
+        </div>
         <button onclick="startQuickDraw()">STARTA DRAGTRÄNING</button>
 
-        <button class="stop-btn" onclick="stopEverything()">AVBRYT</button>
+        <button class="stop-btn" onclick="stopEverything()">AVBRYT ÖVNING</button>
     </div>
 
     <div id="main-view">
         <div id="big-info">
-            <div id="instruction">Redo</div>
-            <div id="command" class="cmd-wait">VÄNTA</div>
+            <div id="instruction">System Standby</div>
+            <div id="command" class="cmd-wait">-</div>
             <div id="progress-info"></div>
         </div>
 
@@ -105,17 +184,19 @@
         </div>
 
         <div id="analysis-box">
-            <canvas id="graphCanvas" width="200" height="200"></canvas>
-            <div style="font-size: 10px; text-align: center; color: #666; margin-top:5px;">REKYL-GRAF</div>
+            <canvas id="graphCanvas" width="220" height="220"></canvas>
+            <div class="box-title">REKYLANALYS (0.5s)</div>
         </div>
 
-        <div id="log">Väntar på anslutning...</div>
+        <div id="log">
+            <div><span class="log-time">[SYS]</span> Initialiserar terminal...</div>
+        </div>
     </div>
 
     <script>
         let client, isRunning = false;
         let cycleTimeout, startTime, precisionTimer;
-        const PIXELS_PER_CM = 38; // Standard DPI
+        const PIXELS_PER_CM = 38; 
 
         const target = document.getElementById('target');
         const targetContainer = document.getElementById('target-container');
@@ -134,29 +215,28 @@
                 const data = JSON.parse(msg.payloadString);
                 if (data.action === "BANG") handleShot(data);
             };
-            client.connect({ useSSL: true, onSuccess: () => { client.subscribe(myId); addLog("Kopplad och redo!"); }});
+            client.connect({ useSSL: true, onSuccess: () => { client.subscribe(myId); addLog("Sensor Länkad"); }});
         }
         connect();
 
-        function addLog(msg) { log.innerHTML = `<div>> ${msg}</div>` + log.innerHTML; }
+        function addLog(msg) { 
+            const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+            log.innerHTML = `<div><span class="log-time">[${time}]</span> ${msg}</div>` + log.innerHTML; 
+        }
 
         function setScale(virtualDist) {
             const physDist = parseFloat(document.getElementById('physDist').value);
-            
-            // Matematiken: Cirkeln är 1% av avståndet. 
-            // Står du 2.5m bort blir cirkeln fysiskt 2.5cm på din skärm.
             const circleSizeOnScreenCm = physDist * 1.0; 
             const circleSizePixels = circleSizeOnScreenCm * PIXELS_PER_CM;
             
             innerCircle.style.width = circleSizePixels + "px";
             innerCircle.style.height = circleSizePixels + "px";
             
-            // Hela tavlan ("gubben") är ca 4 gånger större än den inre cirkeln
             const targetContainerSize = circleSizePixels * 4; 
             targetContainer.style.width = targetContainerSize + "px";
             targetContainer.style.height = targetContainerSize + "px";
             
-            addLog(`Målavstånd: ${virtualDist}m`);
+            addLog(`Skalad för ${virtualDist}m`);
         }
 
         function handleShot(data) {
@@ -166,7 +246,6 @@
             const centerX = rect.width / 2;
             const centerY = rect.height / 2;
             
-            // Sensorkänslighet
             const hitX = centerX + (data.x * 12);
             const hitY = centerY + (data.y * 12);
             
@@ -179,11 +258,11 @@
             const circleRadius = parseFloat(innerCircle.style.width) / 2;
 
             if (dist <= circleRadius) {
-                showBigFeedback("TRÄFF", "#4CAF50"); // Grönt (I cirkeln)
+                showBigFeedback("TRÄFF", "var(--neon-green)"); 
             } else if (dist <= centerX) {
-                showBigFeedback("UTANFÖR", "#ffeb3b"); // Gult (I tavlan, utanför cirkeln)
+                showBigFeedback("UTANFÖR", "var(--neon-orange)"); 
             } else {
-                showBigFeedback("BOM", "#f44336"); // Rött (Bredvid tavlan)
+                showBigFeedback("BOM", "var(--neon-red)"); 
             }
             drawGraph(data.trace, data.x, data.y);
         }
@@ -191,8 +270,8 @@
         function showBigFeedback(text, color) {
             hitFeedback.innerText = text;
             hitFeedback.style.color = color;
-            hitFeedback.style.opacity = "1";
-            setTimeout(() => { hitFeedback.style.opacity = "0"; }, 600);
+            hitFeedback.classList.add('feedback-pop');
+            setTimeout(() => { hitFeedback.classList.remove('feedback-pop'); }, 400);
         }
 
         const wait = (ms) => new Promise(r => cycleTimeout = setTimeout(r, ms));
@@ -201,12 +280,12 @@
             stopEverything(); isRunning = true;
             for (let o = 1; o <= 3; o++) {
                 if(!isRunning) break;
-                addLog(`-- OMGÅNG ${o} --`);
+                addLog(`Startar Omgång ${o}`);
                 await runSubMoment(`Låg färdigställning (Omgång ${o})`, 10, 3000, 5);
                 await runSubMoment(`Drag från hölster (Omgång ${o})`, 10, 4000, 5);
                 await runPrecision(15, 60000, 3);
             }
-            if(isRunning) { inst.innerText = "KLAR!"; cmd.innerText = "BRA JOBBAT!"; progressInfo.innerText = ""; isRunning = false; }
+            if(isRunning) { inst.innerText = "Nivåkontroll Klar"; cmd.innerText = "GODKÄND?"; cmd.className="cmd-wait"; progressInfo.innerText = ""; isRunning = false; }
         }
 
         async function runSubMoment(name, dist, time, reps) {
@@ -215,7 +294,7 @@
             for(let i=0; i<reps; i++) {
                 if(!isRunning) return;
                 progressInfo.innerText = `Visning ${i+1} av ${reps}`;
-                cmd.innerText = "VÄNTA"; cmd.className = "cmd-wait";
+                cmd.innerText = "STANDBY"; cmd.className = "cmd-wait";
                 await wait(4000);
                 if(!isRunning) return;
                 startTime = Date.now();
@@ -255,11 +334,13 @@
             setScale(d);
             let v = 1;
             while(isRunning) {
-                inst.innerText = "Fri träning"; progressInfo.innerText = `Visning ${v}`;
-                cmd.innerText = "VÄNTA"; await wait(Math.random()*3000+2000);
+                inst.innerText = "Fri Träning"; progressInfo.innerText = `Visning ${v}`;
+                cmd.innerText = "STANDBY"; cmd.className = "cmd-wait";
+                await wait(Math.random()*3000+2000);
                 if(!isRunning) break;
                 target.classList.add('visible');
-                cmd.innerText = "ELD!"; await wait(t);
+                cmd.innerText = "ELD!"; cmd.className = "cmd-fire";
+                await wait(t);
                 target.classList.remove('visible');
                 await wait(2000); v++;
             }
@@ -268,21 +349,40 @@
         function stopEverything() {
             clearTimeout(cycleTimeout); clearInterval(precisionTimer);
             isRunning = false; target.classList.remove('visible');
-            cmd.innerText = "STOPP"; progressInfo.innerText = "";
-            document.querySelectorAll('.bullet-hole').forEach(e => e.remove()); // Rensar hål
+            cmd.innerText = "-"; inst.innerText = "System Standby"; progressInfo.innerText = "";
+            document.querySelectorAll('.bullet-hole').forEach(e => e.remove());
         }
 
         function drawGraph(trace, fx, fy) {
-            gCtx.clearRect(0,0,200,200);
-            gCtx.strokeStyle = "#333"; gCtx.beginPath(); gCtx.moveTo(100,0); gCtx.lineTo(100,200); gCtx.moveTo(0,100); gCtx.lineTo(200,100); gCtx.stroke();
+            gCtx.clearRect(0,0,220,220);
+            
+            // Grid
+            gCtx.strokeStyle = "rgba(255,255,255,0.1)"; gCtx.lineWidth = 1;
+            gCtx.beginPath(); 
+            for(let i=0; i<=220; i+=22) { gCtx.moveTo(i,0); gCtx.lineTo(i,220); gCtx.moveTo(0,i); gCtx.lineTo(220,i); }
+            gCtx.stroke();
+
+            // Center lines
+            gCtx.strokeStyle = "rgba(0, 229, 255, 0.4)"; gCtx.beginPath(); gCtx.moveTo(110,0); gCtx.lineTo(110,220); gCtx.moveTo(0,110); gCtx.lineTo(220,110); gCtx.stroke();
+            
             if(!trace) return;
-            gCtx.strokeStyle = "#2196F3"; gCtx.beginPath();
+
+            // Spår (Neon Blå)
+            gCtx.strokeStyle = "var(--neon-blue)"; gCtx.lineWidth = 2; 
+            gCtx.shadowBlur = 5; gCtx.shadowColor = "var(--neon-blue)";
+            gCtx.beginPath();
             trace.forEach((p, i) => {
-                let x = 100 + (p.x * 5); let y = 100 + (p.y * 5);
+                let x = 110 + (p.x * 5); let y = 110 + (p.y * 5);
                 if(i===0) gCtx.moveTo(x,y); else gCtx.lineTo(x,y);
             });
             gCtx.stroke();
-            gCtx.fillStyle = "red"; gCtx.beginPath(); gCtx.arc(100+(fx*5), 100+(fy*5), 4, 0, 7); gCtx.fill();
+            gCtx.shadowBlur = 0; // Återställ
+
+            // Skottet (Neon Röd)
+            gCtx.fillStyle = "var(--neon-red)"; 
+            gCtx.shadowBlur = 8; gCtx.shadowColor = "var(--neon-red)";
+            gCtx.beginPath(); gCtx.arc(110+(fx*5), 110+(fy*5), 5, 0, 7); gCtx.fill();
+            gCtx.shadowBlur = 0;
         }
     </script>
 </body>
