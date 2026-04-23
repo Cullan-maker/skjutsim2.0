@@ -10,10 +10,11 @@
 
         body { margin: 0; background: #000; color: white; font-family: 'Rajdhani', sans-serif; overflow: hidden; text-align: center; height: 100vh; width: 100vw; }
         
-        #camera-stream { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
+        /* Video-strömmen. Måste ha playsinline för iPhone */
+        #camera-stream { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; background: #050505; }
+        
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; transition: background 0.05s; }
         
-        /* Mer kompakt överdel */
         .panel { 
             background: rgba(10, 10, 12, 0.85); backdrop-filter: blur(5px);
             padding: 10px 20px; pointer-events: auto; display: flex; flex-direction: row; justify-content: space-between; align-items: center;
@@ -27,14 +28,12 @@
         }
         button:active { background: #00e5ff; color: #000; }
         
-        /* Diskretare kalibreringsknapp */
         #calBtn { display: none; background: rgba(0, 230, 118, 0.1); color: #00e676; border-color: #00e676; padding: 8px 15px; font-size: 14px; }
         #calBtn:active { background: #00e676; color: #000; }
         
         /* --- PERFEKT LINJERAT METALLISKT SIKTE --- */
         #sight-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5; pointer-events: none; width: 220px; height: 100px; }
         
-        /* Bakre skåran: Höjd 60px från botten. Överkant är Y=40 */
         .rear-sight { 
             position: absolute; bottom: 0; left: 0; width: 220px; height: 60px; 
             background: linear-gradient(to bottom, #333, #111); 
@@ -42,7 +41,6 @@
             clip-path: polygon(0 0, 85px 0, 85px 100%, 135px 100%, 135px 0, 220px 0, 220px 100%, 0 100%); 
         }
         
-        /* Främre kornet: Höjd 50px + botten 10px. Överkant är Y=40. Perfekt i linje! */
         .front-sight { 
             position: absolute; bottom: 10px; left: 98px;
             width: 24px; height: 50px; 
@@ -76,7 +74,7 @@
 
     <div id="ui-layer">
         <div class="panel" id="top-panel">
-            <div id="status"><span>VAPENSENSOR</span><span style="color:#fff; font-size: 12px;">Väntar på start</span></div>
+            <div id="status"><span>VAPENSENSOR</span><span style="color:#fff; font-size: 12px;" id="sub-status">Väntar på start</span></div>
             <button id="startBtn">AKTIVERA</button>
             <button id="calBtn">KALIBRERA</button>
         </div>
@@ -84,7 +82,7 @@
     </div>
 
     <script>
-        const MY_ID = "min_unika_simulator_123"; 
+        const MY_ID = "min_unika_simulator_123"; // Måste matcha datorskärmen!
 
         let client, audioContext, analyser, dataArray;
         let isReadyToShoot = true;
@@ -96,49 +94,93 @@
 
         const startBtn = document.getElementById('startBtn');
         const calBtn = document.getElementById('calBtn');
-        const statusEl = document.getElementById('status').querySelector('span:nth-child(2)');
+        const statusEl = document.getElementById('status').querySelector('span:nth-child(1)');
+        const subStatusEl = document.getElementById('sub-status');
         const video = document.getElementById('camera-stream');
         const frontSight = document.getElementById('front-sight');
         const frontDot = document.getElementById('front-dot');
 
         async function initSystem() {
-            startBtn.innerText = "...";
-            try { if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(e => {}); } catch(e) {}
+            startBtn.innerText = "LADDAR...";
+            subStatusEl.innerText = "Startar kameran...";
+            
+            // 1. Tvinga Helskärm (Ignorera om det misslyckas, det får inte stoppa kameran)
+            try { 
+                if (document.documentElement.requestFullscreen) {
+                    await document.documentElement.requestFullscreen();
+                }
+            } catch(e) { console.log("Helskärm nekad"); }
 
+            // 2. Starta Kamera & Mikrofon säkert
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: { facingMode: { ideal: "environment" } } });
+                // "facingMode: environment" tvingar fram bakkameran på mobilen
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: true, 
+                    video: { facingMode: "environment" } 
+                });
+                
                 video.srcObject = stream;
+                
+                // FIXEN: Detta tvingar webbläsaren att faktiskt spela upp bilden
+                await video.play(); 
 
+                subStatusEl.innerText = "Kamera ok. Startar ljud...";
+
+                // 3. Starta Ljudanalysatorn
                 const AudioCtx = window.AudioContext || window.webkitAudioContext;
                 audioContext = new AudioCtx();
-                if(audioContext.state === 'suspended') audioContext.resume();
+                if(audioContext.state === 'suspended') await audioContext.resume();
                 
                 const source = audioContext.createMediaStreamSource(stream);
                 analyser = audioContext.createAnalyser();
                 source.connect(analyser);
                 dataArray = new Uint8Array(analyser.frequencyBinCount);
 
+                subStatusEl.innerText = "Ljud ok. Startar gyro...";
+
+                // 4. Begär Gyroskop (Krävs på iPhone)
                 if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                    await DeviceOrientationEvent.requestPermission();
+                    const perm = await DeviceOrientationEvent.requestPermission();
+                    if (perm !== 'granted') throw new Error("Gyroskop nekat");
                 }
 
+                subStatusEl.innerText = "Kopplar till skärm...";
+
+                // 5. Koppla till molnet
                 client = new Paho.MQTT.Client("broker.hivemq.com", Number(8884), "phone_" + Math.random().toString(16).substr(2, 8));
-                client.connect({ useSSL: true, onSuccess: () => { 
-                    statusEl.innerText = "Kopplad - Sikta framåt";
-                    statusEl.style.color = "#00e676";
-                    startBtn.style.display = "none";
-                    calBtn.style.display = "block";
-                    document.getElementById('sight-container').style.display = "block";
-                    
-                    window.addEventListener('deviceorientation', handleOrientation);
-                    detectSound(); physicsLoop();
-                }});
-            } catch (error) { alert("Fel: " + error.message); }
+                client.connect({ 
+                    useSSL: true, 
+                    onSuccess: () => { 
+                        statusEl.innerText = "SENSOR KOPPLAD";
+                        subStatusEl.innerText = "Rikta mot skärm och kalibrera";
+                        subStatusEl.style.color = "#00e676";
+                        
+                        startBtn.style.display = "none";
+                        calBtn.style.display = "block";
+                        document.getElementById('sight-container').style.display = "block";
+                        
+                        window.addEventListener('deviceorientation', handleOrientation);
+                        detectSound(); 
+                        physicsLoop();
+                    },
+                    onFailure: (err) => {
+                        throw new Error("Nätverksfel");
+                    }
+                });
+
+            } catch (error) { 
+                alert("Tekniskt fel: " + error.message); 
+                startBtn.innerText = "FÖRSÖK IGEN";
+                subStatusEl.innerText = "Kunde inte starta sensorer";
+                subStatusEl.style.color = "red";
+            }
         }
 
         calBtn.addEventListener('click', () => {
             startAlpha = null; traceHistory = [];
-            statusEl.innerText = "Sensor Aktiv"; statusEl.style.color = "#fff";
+            statusEl.innerText = "SENSOR AKTIV"; 
+            subStatusEl.innerText = "Redo att skjuta";
+            subStatusEl.style.color = "#fff";
         });
 
         function handleOrientation(event) {
