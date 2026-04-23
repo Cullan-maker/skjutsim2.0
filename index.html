@@ -8,28 +8,20 @@
         @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700;900&family=Roboto:wght@400;700&display=swap');
 
         :root {
-            /* Wellpapp-bruna färger för realistisk skjutbane-känsla */
-            --bg-cardboard-light: #d4a373;
-            --bg-cardboard-dark: #a8794c;
-            --neon-blue: #00e5ff;
-            --neon-green: #00e676;
-            --neon-red: #ff1744;
-            --neon-orange: #ff9800;
+            var(--bg-cardboard-light): #d4a373; var(--bg-cardboard-dark): #a8794c;
+            --neon-blue: #00e5ff; --neon-green: #00e676; --neon-red: #ff1744; --neon-orange: #ff9800;
         }
 
         body { 
-            margin: 0; 
-            background: radial-gradient(circle at 50% 40%, var(--bg-cardboard-light) 0%, var(--bg-cardboard-dark) 100%);
+            margin: 0; background: radial-gradient(circle at 50% 40%, #d4a373 0%, #a8794c 100%);
             overflow: hidden; display: flex; height: 100vh; width: 100vw; 
             font-family: 'Rajdhani', sans-serif; color: #222;
         }
         
-        /* Sidebar */
         #sidebar { 
             width: 360px; background: rgba(255, 255, 255, 0.2); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
             padding: 30px; box-sizing: border-box; display: flex; flex-direction: column; gap: 15px; 
-            border-right: 1px solid rgba(255,255,255,0.3); z-index: 100;
-            box-shadow: 10px 0 30px rgba(0,0,0,0.2);
+            border-right: 1px solid rgba(255,255,255,0.3); z-index: 100; box-shadow: 10px 0 30px rgba(0,0,0,0.2);
         }
         
         h2 { margin: 0; color: #222; font-size: 32px; font-weight: 900; letter-spacing: 1px; text-shadow: 1px 1px 0px rgba(255,255,255,0.5); }
@@ -39,14 +31,12 @@
         label { font-size: 12px; color: #333; font-weight: 900; text-transform: uppercase;}
         input { 
             width: 100%; padding: 12px; background: rgba(255,255,255,0.5); border: 1px solid rgba(0,0,0,0.1); color: #222; 
-            border-radius: 6px; font-size: 16px; font-weight: bold; font-family: 'Roboto'; box-sizing: border-box;
-            outline: none;
+            border-radius: 6px; font-size: 16px; font-weight: bold; font-family: 'Roboto'; box-sizing: border-box; outline: none;
         }
         
         button { 
             background: #222; color: #fff; border: none; padding: 14px; font-family: 'Rajdhani'; 
-            font-size: 18px; font-weight: 900; border-radius: 6px; cursor: pointer; transition: 0.2s; 
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3); margin-top: 5px;
+            font-size: 18px; font-weight: 900; border-radius: 6px; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.3); margin-top: 5px;
         }
         button:hover { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(0,0,0,0.4); }
         button:active { transform: translateY(1px); }
@@ -54,7 +44,6 @@
         button.niva-btn { background: linear-gradient(135deg, #f57c00 0%, #e65100 100%); }
         button.stop-btn { background: transparent; border: 2px solid var(--neon-red); color: var(--neon-red); margin-top: auto; box-shadow: none; }
         button.stop-btn:hover { background: rgba(255, 23, 68, 0.1); }
-        
         #toggle-laser { background: rgba(0, 229, 255, 0.2); color: #005566; border: 2px solid #00e5ff; font-size: 14px; padding: 10px; box-shadow: none; }
 
         #main-view { flex-grow: 1; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; }
@@ -74,80 +63,52 @@
         }
         .feedback-pop { opacity: 1 !important; transform: scale(1) !important; }
 
-        /* --- STÖRRE KALIBRERINGSMARKÖR --- */
         #calibration-mark {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             width: 80px; height: 80px; z-index: 10; opacity: 1; transition: opacity 0.3s;
         }
-        #calibration-mark::before, #calibration-mark::after {
-            content: ''; position: absolute; background: var(--neon-blue);
-            box-shadow: 0 0 15px var(--neon-blue);
-        }
+        #calibration-mark::before, #calibration-mark::after { content: ''; position: absolute; background: var(--neon-blue); box-shadow: 0 0 15px var(--neon-blue); }
         #calibration-mark::before { width: 100%; height: 4px; top: 38px; left: 0; }
         #calibration-mark::after { width: 4px; height: 100%; top: 0; left: 38px; }
         .hidden-mark { opacity: 0 !important; }
 
-        /* --- PBR MÅLTAVLA --- */
         #target-wrapper { position: relative; transition: transform 0.4s ease; z-index: 20; }
         #target-container { perspective: 1200px; display: flex; align-items: center; justify-content: center; }
         
         #target {
-            width: 100%; height: 100%; border-radius: 50%;
-            background: radial-gradient(circle at 30% 30%, #3a3a3a 0%, #111 80%);
-            border: 4px solid #fff;
-            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
-            transform: rotateY(90deg);
+            width: 100%; height: 100%; border-radius: 50%; background: radial-gradient(circle at 30% 30%, #3a3a3a 0%, #111 80%);
+            border: 4px solid #fff; transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); transform: rotateY(90deg);
             box-shadow: inset 0 0 50px rgba(0,0,0,1), 20px 20px 60px rgba(0,0,0,0.6), -2px -2px 10px rgba(255,255,255,0.3);
             position: relative; overflow: hidden;
         }
-        
         #inner-circle { 
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-            border: 3px solid rgba(255,255,255,0.6); border-radius: 50%; 
-            box-sizing: border-box; box-shadow: 0 0 15px rgba(255,255,255,0.2), inset 0 0 15px rgba(255,255,255,0.2);
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border: 3px solid rgba(255,255,255,0.6); border-radius: 50%; box-sizing: border-box; box-shadow: 0 0 15px rgba(255,255,255,0.2), inset 0 0 15px rgba(255,255,255,0.2);
         }
-        
         .visible { transform: rotateY(0deg) !important; }
         
-        /* Fysiska skotthål */
         .bullet-hole { 
-            position: absolute; width: 16px; height: 16px; 
-            background: #050505; border-radius: 50%; transform: translate(-50%, -50%); z-index: 30;
-            box-shadow: inset 0 5px 10px rgba(0,0,0,1), 0 1px 1px rgba(255,255,255,0.5);
+            position: absolute; width: 16px; height: 16px; background: #050505; border-radius: 50%; transform: translate(-50%, -50%); z-index: 30; box-shadow: inset 0 5px 10px rgba(0,0,0,1), 0 1px 1px rgba(255,255,255,0.5);
         }
 
-        /* Partikel Canvas */
         #fxCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 40; pointer-events: none; }
 
-        /* SKYTTEANALYS MODAL */
-        #summary-overlay { 
-            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; 
-            background: rgba(0,0,0,0.85); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-            z-index: 200; display: none; align-items: center; justify-content: center; color: white;
-        }
-        #summary-box { 
-            background: #1a1a24; padding: 40px; border-radius: 16px; 
-            border: 1px solid var(--neon-blue); box-shadow: 0 0 50px rgba(0, 229, 255, 0.15); 
-            width: 450px; text-align: center; 
-        }
+        /* NY STÖRRE GRAF-LÅDA */
+        #analysis-box { position: absolute; bottom: 30px; left: 30px; background: rgba(0,0,0,0.75); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 15px; z-index: 50; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        canvas.heatmap { background: rgba(0,0,0,0.5); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); }
+        .box-title { font-family: 'Rajdhani'; font-size: 16px; letter-spacing: 2px; color: var(--neon-blue); text-align: center; margin-top: 10px; font-weight: 700; }
+
+        #summary-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); backdrop-filter: blur(10px); z-index: 200; display: none; align-items: center; justify-content: center; color: white; }
+        #summary-box { background: #1a1a24; padding: 40px; border-radius: 16px; border: 1px solid var(--neon-blue); box-shadow: 0 0 50px rgba(0, 229, 255, 0.15); width: 450px; text-align: center; }
         #summary-box h2 { color: var(--neon-blue); margin-bottom: 25px; font-size: 38px; text-shadow: none; }
         .stat-line { display: flex; justify-content: space-between; font-size: 20px; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; font-family: 'Roboto'; }
-        
-        /* Mini-graf till vänster */
-        #analysis-box { position: absolute; bottom: 30px; left: 30px; background: rgba(0,0,0,0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 15px; z-index: 50; }
-        canvas.heatmap { background: rgba(0,0,0,0.5); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); }
-        .box-title { font-family: 'Rajdhani'; font-size: 14px; letter-spacing: 2px; color: var(--neon-blue); text-align: center; margin-top: 10px; font-weight: 700; }
-
     </style>
 </head>
 <body>
 
     <div id="sidebar">
         <h2>SKJUTBIOGRAF</h2>
-        
-        <h3>System</h3>
         <div class="setting-group"><label>Nätverks-ID</label><input type="text" id="myId" value="min_unika_simulator_123"></div>
-        <div class="setting-group"><label>Avstånd till skärm (Meter)</label><input type="number" id="physDist" value="2.5" step="0.1"></div>
+        <div class="setting-group"><label>Avstånd till skärm (m)</label><input type="number" id="physDist" value="2.5" step="0.1"></div>
         
         <div class="setting-group" style="margin-top: 10px;">
             <label>Sikte på skärmen</label>
@@ -168,7 +129,6 @@
 
     <div id="main-view">
         <canvas id="fxCanvas"></canvas>
-        
         <div id="calibration-mark"></div>
 
         <div id="big-info">
@@ -176,7 +136,6 @@
             <div id="command">-</div>
             <div id="progress-info"></div>
         </div>
-
         <div id="hit-feedback">TRÄFF</div>
 
         <div id="target-wrapper">
@@ -186,8 +145,8 @@
         </div>
         
         <div id="analysis-box">
-            <canvas id="graphCanvas" class="heatmap" width="220" height="220"></canvas>
-            <div class="box-title">REKYL-HEATMAP (0.5s)</div>
+            <canvas id="graphCanvas" class="heatmap" width="300" height="300"></canvas>
+            <div class="box-title">REKYL-ANALYS (0.5s)</div>
         </div>
     </div>
 
@@ -201,9 +160,8 @@
     </div>
 
     <script>
-        let client, isRunning = false, cycleTimeout, precisionTimer;
+        let client, isRunning = false, cycleTimeout, precisionTimer, animationFrameId;
         const PIXELS_PER_CM = 38; 
-        
         let laserEnabled = true;
         let sessionStats = { total: 0, circle: 0, target: 0, miss: 0, drawTimes: [] };
 
@@ -216,8 +174,6 @@
         const hitFeedback = document.getElementById('hit-feedback');
         const calMark = document.getElementById('calibration-mark');
         const gCtx = document.getElementById('graphCanvas').getContext('2d');
-        
-        // FX Canvas
         const canvas = document.getElementById('fxCanvas');
         const ctx = canvas.getContext('2d');
         let particles = [];
@@ -228,8 +184,7 @@
         function createParticles(x, y, color) {
             for (let i = 0; i < 20; i++) {
                 particles.push({
-                    x: x, y: y,
-                    vx: (Math.random() - 0.5) * 15, vy: (Math.random() - 0.5) * 15,
+                    x: x, y: y, vx: (Math.random() - 0.5) * 15, vy: (Math.random() - 0.5) * 15,
                     life: 1.0, color: color, size: Math.random() * 5 + 2
                 });
             }
@@ -239,8 +194,7 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             for (let i = particles.length - 1; i >= 0; i--) {
                 let p = particles[i];
-                p.x += p.vx; p.y += p.vy; p.vy += 0.3; // Gravity
-                p.life -= 0.02;
+                p.x += p.vx; p.y += p.vy; p.vy += 0.3; p.life -= 0.02;
                 ctx.fillStyle = p.color; ctx.globalAlpha = Math.max(0, p.life);
                 ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
                 if (p.life <= 0) particles.splice(i, 1);
@@ -265,10 +219,7 @@
             const myId = document.getElementById('myId').value;
             client = new Paho.MQTT.Client("broker.hivemq.com", Number(8884), "screen_" + Math.random().toString(16).slice(2,8));
             client.onMessageArrived = (msg) => { if (JSON.parse(msg.payloadString).action === "BANG") handleShot(JSON.parse(msg.payloadString)); };
-            client.connect({ useSSL: true, onSuccess: () => { 
-                client.subscribe(myId); 
-                inst.innerText = "Kopplad - Redo";
-            }});
+            client.connect({ useSSL: true, onSuccess: () => { client.subscribe(myId); inst.innerText = "Kopplad - Redo"; }});
         }
         connect();
 
@@ -276,7 +227,6 @@
             const physDist = parseFloat(document.getElementById('physDist').value);
             const circleSizePixels = (physDist * 1.0) * PIXELS_PER_CM;
             innerCircle.style.width = circleSizePixels + "px"; innerCircle.style.height = circleSizePixels + "px";
-            
             const targetContainerSize = circleSizePixels * 3; 
             targetContainer.style.width = targetContainerSize + "px"; targetContainer.style.height = targetContainerSize + "px";
         }
@@ -294,10 +244,8 @@
 
             const dist = Math.sqrt(Math.pow(hitX - centerX, 2) + Math.pow(hitY - centerY, 2));
             const circleRadius = parseFloat(innerCircle.style.width) / 2;
-
             const globalX = rect.left + hitX; const globalY = rect.top + hitY;
 
-            // Statistik
             sessionStats.total++;
             if(startTime) sessionStats.drawTimes.push((Date.now() - startTime)/1000);
 
@@ -311,7 +259,8 @@
                 showBigFeedback("BOM", "var(--neon-red)"); sessionStats.miss++;
                 createParticles(globalX, globalY, '#222');
             }
-            drawHeatmap(data.trace, data.x, data.y);
+            
+            playSnakeReplay(data.trace, data.x, data.y);
         }
 
         function showBigFeedback(text, color) {
@@ -320,14 +269,73 @@
             setTimeout(() => { hitFeedback.classList.remove('feedback-pop'); }, 500);
         }
 
+        // --- ORM-ANIMATION (SNAKE REPLAY) ---
+        function drawGrid() {
+            gCtx.strokeStyle = "rgba(255,255,255,0.05)"; gCtx.lineWidth = 1; gCtx.beginPath(); 
+            for(let i=0; i<=300; i+=30) { gCtx.moveTo(i,0); gCtx.lineTo(i,300); gCtx.moveTo(0,i); gCtx.lineTo(300,i); } gCtx.stroke();
+            gCtx.strokeStyle = "rgba(0, 229, 255, 0.3)"; gCtx.beginPath(); gCtx.moveTo(150,0); gCtx.lineTo(150,300); gCtx.moveTo(0,150); gCtx.lineTo(300,150); gCtx.stroke();
+        }
+
+        function playSnakeReplay(trace, fx, fy) {
+            cancelAnimationFrame(animationFrameId);
+            if(!trace || trace.length === 0) return;
+            
+            let currentStep = 0;
+            let fadeOutTimer = 0;
+
+            function animate() {
+                gCtx.clearRect(0,0,300,300);
+                drawGrid();
+
+                if(currentStep < trace.length) {
+                    // Fas 1: Ormen växer fram
+                    for(let i=0; i<=currentStep; i++) {
+                        let p = trace[i];
+                        let x = 150 + (p.x * 10); // Känslighet (Skalad för 300px)
+                        let y = 150 + (p.y * 10);
+                        gCtx.fillStyle = `rgba(0, 229, 255, ${i/trace.length})`; // Tonar ut svansen
+                        gCtx.beginPath(); gCtx.arc(x, y, 5, 0, 7); gCtx.fill();
+                    }
+                    currentStep++;
+                    animationFrameId = requestAnimationFrame(animate);
+                } else {
+                    // Fas 2: Ormen stannar och bleknar långsamt bort
+                    fadeOutTimer += 0.015; // Hastigheten på blekningen
+                    let globalAlpha = Math.max(0, 1 - fadeOutTimer);
+
+                    gCtx.globalAlpha = globalAlpha;
+                    for(let i=0; i<trace.length; i++) {
+                        let p = trace[i];
+                        let x = 150 + (p.x * 10); let y = 150 + (p.y * 10);
+                        gCtx.fillStyle = `rgba(0, 229, 255, ${i/trace.length})`;
+                        gCtx.beginPath(); gCtx.arc(x, y, 5, 0, 7); gCtx.fill();
+                    }
+                    gCtx.globalAlpha = 1.0;
+
+                    // Rita det sista skottet (Röd prick) som stannar kvar
+                    let endX = 150 + (fx * 10); let endY = 150 + (fy * 10);
+                    gCtx.fillStyle = "var(--neon-red)"; gCtx.shadowBlur = 10; gCtx.shadowColor = "var(--neon-red)";
+                    gCtx.beginPath(); gCtx.arc(endX, endY, 6, 0, 7); gCtx.fill();
+                    gCtx.shadowBlur = 0;
+
+                    if(globalAlpha > 0) {
+                        animationFrameId = requestAnimationFrame(animate);
+                    }
+                }
+            }
+            animate();
+        }
+
+        // Rita tomt grid från start
+        drawGrid();
+
+        // --- MOMENT ---
         const wait = (ms) => new Promise(r => { if(isRunning) cycleTimeout = setTimeout(r, ms); });
 
         async function countdown(seconds, text) {
             inst.innerText = text; cmd.className = "cmd-wait";
             for(let i=seconds; i>0; i--) {
-                if(!isRunning) return;
-                cmd.innerText = i;
-                await wait(1000);
+                if(!isRunning) return; cmd.innerText = i; await wait(1000);
             }
         }
 
@@ -335,20 +343,14 @@
             stopEverything(); isRunning = true; resetStats();
             for (let o = 1; o <= 3; o++) {
                 if(!isRunning) break;
-                
                 await countdown(10, `OMGÅNG ${o} - FÖRBERED DIG`);
-                if(!isRunning) break;
-                await runSubMoment(`Låg färdigställning (Omgång ${o})`, 10, 3000, 5);
-                
+                if(!isRunning) break; await runSubMoment(`Låg färdigställning (Omgång ${o})`, 10, 3000, 5);
                 await countdown(10, `LADDA OM / FÖRBERED HÖLSTER`);
-                if(!isRunning) break;
-                await runSubMoment(`Drag från hölster (Omgång ${o})`, 10, 4000, 5);
-                
+                if(!isRunning) break; await runSubMoment(`Drag från hölster (Omgång ${o})`, 10, 4000, 5);
                 await countdown(10, `FÖRBERED PRECISION (15 METER)`);
-                if(!isRunning) break;
-                await runPrecision(15, 60000, 3);
+                if(!isRunning) break; await runPrecision(15, 60000, 3);
             }
-            if(isRunning) { stopEverything(); } // Visar resultatet automatiskt
+            if(isRunning) { stopEverything(); }
         }
 
         async function runSubMoment(name, dist, time, reps) {
@@ -357,20 +359,15 @@
                 if(!isRunning) return;
                 progressInfo.innerText = `Visning ${i+1} av ${reps}`;
                 cmd.innerText = "STANDBY"; cmd.style.color = "#444";
-                
                 if(laserEnabled) calMark.classList.remove('hidden-mark');
-                
                 await wait(4000);
                 if(!isRunning) return;
-                
                 calMark.classList.add('hidden-mark');
-                startTime = Date.now();
-                target.classList.add('visible');
+                startTime = Date.now(); target.classList.add('visible');
                 cmd.innerText = "ELD!"; cmd.className = "cmd-fire"; cmd.style.color = "";
                 await wait(time);
                 target.classList.remove('visible');
-                startTime = null;
-                cmd.className = "";
+                startTime = null; cmd.className = "";
                 await wait(2000);
             }
         }
@@ -378,15 +375,11 @@
         async function runPrecision(dist, time, shots) {
             setScale(dist); inst.innerText = "Precision";
             cmd.innerText = `Skjut ${shots} skott`; cmd.style.color = "#444";
-            
             if(laserEnabled) calMark.classList.remove('hidden-mark');
-            
             await wait(4000);
             if(!isRunning) return;
-            
             calMark.classList.add('hidden-mark');
-            startTime = Date.now();
-            target.classList.add('visible');
+            startTime = Date.now(); target.classList.add('visible');
             cmd.innerText = "ELD!"; cmd.className = "cmd-fire"; cmd.style.color = "";
             let sec = time / 1000;
             precisionTimer = setInterval(() => {
@@ -394,35 +387,26 @@
                 if(sec <= 0) clearInterval(precisionTimer);
             }, 1000);
             await wait(time);
-            target.classList.remove('visible');
-            clearInterval(precisionTimer);
-            progressInfo.innerText = "TID UTE"; cmd.className = "";
-            startTime = null;
+            target.classList.remove('visible'); clearInterval(precisionTimer);
+            progressInfo.innerText = "TID UTE"; cmd.className = ""; startTime = null;
             await wait(3000);
         }
 
         async function startQuickDraw() {
             stopEverything(); isRunning = true; resetStats();
-            const d = document.getElementById('virtDist').value;
-            const t = document.getElementById('showTime').value * 1000;
-            setScale(d);
-            let v = 1;
+            const d = document.getElementById('virtDist').value; const t = document.getElementById('showTime').value * 1000;
+            setScale(d); let v = 1;
             while(isRunning) {
                 inst.innerText = "Fri Träning"; progressInfo.innerText = `Visning ${v}`;
                 cmd.innerText = "STANDBY"; cmd.style.color = "#444";
                 if(laserEnabled) calMark.classList.remove('hidden-mark');
-                
                 await wait(Math.random()*3000+2000);
                 if(!isRunning) break;
-                
                 calMark.classList.add('hidden-mark');
-                startTime = Date.now();
-                target.classList.add('visible');
+                startTime = Date.now(); target.classList.add('visible');
                 cmd.innerText = "ELD!"; cmd.className = "cmd-fire"; cmd.style.color = "";
                 await wait(t);
-                target.classList.remove('visible');
-                cmd.className = "";
-                startTime = null;
+                target.classList.remove('visible'); cmd.className = ""; startTime = null;
                 await wait(2000); v++;
             }
         }
@@ -431,14 +415,10 @@
 
         function stopEverything() {
             clearTimeout(cycleTimeout); clearInterval(precisionTimer);
-            const wasRunning = isRunning;
-            isRunning = false; target.classList.remove('visible');
+            const wasRunning = isRunning; isRunning = false; target.classList.remove('visible');
             cmd.innerText = "-"; cmd.className = ""; cmd.style.color = "#222"; 
             inst.innerText = "System Standby"; progressInfo.innerText = "";
-            
-            if(laserEnabled) calMark.classList.remove('hidden-mark');
-            else calMark.classList.add('hidden-mark');
-            
+            if(laserEnabled) calMark.classList.remove('hidden-mark'); else calMark.classList.add('hidden-mark');
             if(wasRunning && sessionStats.total > 0) showSummary();
         }
 
@@ -454,22 +434,6 @@
             document.getElementById('summary-overlay').style.display = 'flex';
         }
         function closeSummary() { document.getElementById('summary-overlay').style.display = 'none'; document.querySelectorAll('.bullet-hole').forEach(e => e.remove()); }
-
-        function drawHeatmap(trace, fx, fy) {
-            gCtx.clearRect(0,0,220,220);
-            gCtx.strokeStyle = "rgba(255,255,255,0.1)"; gCtx.lineWidth = 1; gCtx.beginPath(); 
-            for(let i=0; i<=220; i+=22) { gCtx.moveTo(i,0); gCtx.lineTo(i,220); gCtx.moveTo(0,i); gCtx.lineTo(220,i); } gCtx.stroke();
-            gCtx.strokeStyle = "rgba(0, 229, 255, 0.4)"; gCtx.beginPath(); gCtx.moveTo(110,0); gCtx.lineTo(110,220); gCtx.moveTo(0,110); gCtx.lineTo(220,110); gCtx.stroke();
-            if(!trace) return;
-            trace.forEach((p) => {
-                let x = 110 + (p.x * 5); let y = 110 + (p.y * 5);
-                gCtx.fillStyle = "rgba(0, 229, 255, 0.15)";
-                gCtx.beginPath(); gCtx.arc(x, y, 6, 0, 7); gCtx.fill();
-            });
-            gCtx.fillStyle = "var(--neon-red)"; gCtx.shadowBlur = 10; gCtx.shadowColor = "var(--neon-red)";
-            gCtx.beginPath(); gCtx.arc(110+(fx*5), 110+(fy*5), 5, 0, 7); gCtx.fill();
-            gCtx.shadowBlur = 0;
-        }
     </script>
 </body>
 </html>
